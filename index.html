@@ -4,8 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffdcc4">
+<meta name="description" content="Fruit Merge — бросай фрукты в стакан и собирай арбуз">
+<!-- Запуск с домашнего экрана — на весь экран, без панели браузера -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fruit Merge">
 <title>Fruit Merge</title>
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -325,6 +334,50 @@
   .board .sc { font-weight: 700; }
   .board-src { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
 
+  /* --- Настройки --- */
+  .setting { display: flex; align-items: center; gap: 10px; margin-top: 16px; text-align: left; }
+  .setting .s-label { flex: 0 0 106px; font-size: 16px; font-weight: 600; }
+  .setting .s-val { flex: 0 0 46px; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+  .range {
+    -webkit-appearance: none; appearance: none;
+    flex: 1 1 auto; min-width: 0; height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--accent) var(--val, 50%), #ffe0cf var(--val, 50%));
+    outline: none;
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--accent);
+    box-shadow: 0 2px 5px rgba(160,60,30,.3);
+  }
+  .range::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--accent);
+    box-shadow: 0 2px 5px rgba(160,60,30,.3);
+  }
+  .switch {
+    -webkit-appearance: none; appearance: none;
+    position: relative; margin-left: auto;
+    width: 54px; height: 32px; border-radius: 16px;
+    background: #ead2c6; cursor: pointer; transition: background .2s;
+  }
+  .switch::before {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    transition: transform .2s;
+  }
+  .switch:checked { background: #4cc36b; }
+  .switch:checked::before { transform: translateX(22px); }
+  .tip {
+    margin-top: 12px; padding: 10px 12px;
+    border-radius: 14px; background: #fff3ea;
+    font-size: 13px; line-height: 1.35; color: var(--ink-soft);
+  }
+  .tip button { float: right; font-size: 16px; line-height: 1; padding: 0 0 4px 8px; color: var(--ink-soft); }
+  .privacy { font-size: 11px; color: var(--ink-soft); opacity: .8; margin-top: 14px; line-height: 1.35; }
+
   .hidden { display: none !important; }
   .hint { font-size: 13px; color: var(--ink-soft); margin-top: 12px; line-height: 1.35; }
   #errorBox { position: fixed; inset: 0; display: none; place-items: center; padding: 30px; text-align: center; font-size: 18px; background: #ffe3cf; z-index: 50; }
@@ -397,6 +450,8 @@
         <div class="label-sm">или выбери игрока</div>
         <div class="chips" id="playerChips"></div>
       </div>
+      <div class="privacy">Игра сохраняет имя, рекорды, настройки звука и общие сведения об устройстве
+        (браузер, система, размер экрана), чтобы делать игру лучше.</div>
     </div>
   </div>
 
@@ -417,8 +472,35 @@
       <button class="btn secondary hidden" id="btnNew">Новая игра</button>
       <div class="row">
         <button class="btn secondary wide" id="btnBoard">🏆 Рейтинг</button>
-        <button class="btn secondary" id="btnSound">🔊</button>
+        <button class="btn secondary" id="btnSettings">⚙️ Звук</button>
       </div>
+      <div class="tip hidden" id="iosTip"><button id="btnIosTipClose" aria-label="Скрыть">✕</button>
+        📲 Чтобы играть на весь экран без панели браузера: «Поделиться» → «На экран „Домой“».</div>
+    </div>
+  </div>
+
+  <!-- Настройки -->
+  <div class="overlay" id="settings">
+    <div class="card">
+      <h2>Настройки</h2>
+      <label class="setting">
+        <span class="s-label">🎵 Музыка</span>
+        <input class="range" type="range" id="volMusic" min="0" max="100" step="1">
+        <span class="s-val" id="volMusicVal"></span>
+      </label>
+      <label class="setting">
+        <span class="s-label">🔔 Эффекты</span>
+        <input class="range" type="range" id="volSfx" min="0" max="100" step="1">
+        <span class="s-val" id="volSfxVal"></span>
+      </label>
+      <label class="setting">
+        <span class="s-label">📳 Вибрация</span>
+        <input class="switch" type="checkbox" id="optVibration">
+      </label>
+      <button class="btn secondary" id="btnFullscreen">⛶ На весь экран</button>
+      <div class="tip hidden" id="iosTip2">📲 На iPhone панель браузера скрыть нельзя, но можно добавить игру
+        на домашний экран: «Поделиться» → «На экран „Домой“». Оттуда она запускается на весь экран.</div>
+      <button class="btn" id="btnSettingsClose">Готово</button>
     </div>
   </div>
 
@@ -515,17 +597,17 @@
      r — радиус; c1/c2/c3 — светлый/основной/тёмный тон градиента; line — контур;
      eyes/mouth — вариант рожицы; blush — цвет румянца. */
   const FRUITS = [
-    { name: 'Черника',  type: 'blueberry',   r: 14, c1: '#a9bcff', c2: '#5a6fe0', c3: '#2d3486', line: '#232766', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,140,190,.65)' },
-    { name: 'Малина',   type: 'raspberry',   r: 18, c1: '#ffa6c3', c2: '#ee4680', c3: '#a3164a', line: '#7d1038', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,200,220,.6)' },
-    { name: 'Клубника', type: 'strawberry',  r: 23, c1: '#ffa197', c2: '#f23e3f', c3: '#a8141f', line: '#821019', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,190,200,.65)' },
-    { name: 'Лайм',     type: 'lime',        r: 28, c1: '#e0fa96', c2: '#86d236', c3: '#428e14', line: '#2f6a0c', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,130,150,.5)' },
-    { name: 'Персик',   type: 'peach',       r: 34, c1: '#ffe6c2', c2: '#ffb37c', c3: '#f2775d', line: '#c4523f', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,100,120,.45)' },
-    { name: 'Апельсин', type: 'orange',      r: 40, c1: '#ffdb85', c2: '#ffa024', c3: '#e0660b', line: '#b04c06', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,100,110,.45)' },
-    { name: 'Яблоко',   type: 'apple',       r: 47, c1: '#ffa292', c2: '#ea3a3f', c3: '#9e1220', line: '#7c0e19', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,190,200,.6)' },
-    { name: 'Гранат',   type: 'pomegranate', r: 54, c1: '#ff98ad', c2: '#c8254f', c3: '#7a0a2a', line: '#5c0820', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,190,210,.55)' },
-    { name: 'Кокос',    type: 'coconut',     r: 61, c1: '#d3a47c', c2: '#8f5e39', c3: '#56351d', line: '#3f2614', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,150,150,.5)' },
-    { name: 'Ананас',   type: 'pineapple',   r: 68, c1: '#fff3a3', c2: '#ffcc33', c3: '#e39c0b', line: '#a86f05', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,120,120,.5)' },
-    { name: 'Арбуз',    type: 'watermelon',  r: 77, c1: '#b2f293', c2: '#48bb3c', c3: '#1f7a22', line: '#145a17', eyes: 'happy', mouth: 'open',  blush: 'rgba(255,130,150,.6)' },
+    { name: 'Черника',  type: 'blueberry',   r: 14, c1: '#a9bcff', c2: '#5a6fe0', c3: '#2d3486', line: '#232766', mouth: 'smile', blush: 'rgba(255,140,190,.65)' },
+    { name: 'Малина',   type: 'raspberry',   r: 18, c1: '#ffa6c3', c2: '#ee4680', c3: '#a3164a', line: '#7d1038', mouth: 'smile', blush: 'rgba(255,200,220,.6)' },
+    { name: 'Клубника', type: 'strawberry',  r: 23, c1: '#ffa197', c2: '#f23e3f', c3: '#a8141f', line: '#821019', mouth: 'open',  blush: 'rgba(255,190,200,.65)' },
+    { name: 'Лайм',     type: 'lime',        r: 28, c1: '#e0fa96', c2: '#86d236', c3: '#428e14', line: '#2f6a0c', mouth: 'smile', blush: 'rgba(255,130,150,.5)' },
+    { name: 'Персик',   type: 'peach',       r: 34, c1: '#ffe6c2', c2: '#ffb37c', c3: '#f2775d', line: '#c4523f', mouth: 'smile', blush: 'rgba(255,100,120,.45)' },
+    { name: 'Апельсин', type: 'orange',      r: 40, c1: '#ffdb85', c2: '#ffa024', c3: '#e0660b', line: '#b04c06', mouth: 'open',  blush: 'rgba(255,100,110,.45)' },
+    { name: 'Яблоко',   type: 'apple',       r: 47, c1: '#ffa292', c2: '#ea3a3f', c3: '#9e1220', line: '#7c0e19', mouth: 'smile', blush: 'rgba(255,190,200,.6)' },
+    { name: 'Гранат',   type: 'pomegranate', r: 54, c1: '#ff98ad', c2: '#c8254f', c3: '#7a0a2a', line: '#5c0820', mouth: 'smile', blush: 'rgba(255,190,210,.55)' },
+    { name: 'Кокос',    type: 'coconut',     r: 61, c1: '#d3a47c', c2: '#8f5e39', c3: '#56351d', line: '#3f2614', mouth: 'open',  blush: 'rgba(255,150,150,.5)' },
+    { name: 'Ананас',   type: 'pineapple',   r: 68, c1: '#fff3a3', c2: '#ffcc33', c3: '#e39c0b', line: '#a86f05', mouth: 'smile', blush: 'rgba(255,120,120,.5)' },
+    { name: 'Арбуз',    type: 'watermelon',  r: 77, c1: '#b2f293', c2: '#48bb3c', c3: '#1f7a22', line: '#145a17', mouth: 'open',  blush: 'rgba(255,130,150,.6)' },
   ];
   const LAST_LEVEL = FRUITS.length - 1;
   // Очки за создание фрукта уровня n: растут с уровнем (треугольные числа × 2)
@@ -669,18 +751,60 @@
   };
   DB.load();
 
-  /* Общий рейтинг. Если игра запущена через deploy/app.py (Gunicorn),
-     сервер хранит результаты всех игроков в JSON-файле. На статическом
-     хостинге (GitHub Pages) API нет — тогда показывается рейтинг устройства. */
+  /* Настройки устройства: громкость музыки и эффектов (0..1), вибрация. */
+  if (!DB.data.settings) {
+    const muted = DB.data.sound === false;
+    DB.data.settings = { music: muted ? 0 : 0.5, sfx: muted ? 0 : 0.8, vibration: true };
+    delete DB.data.sound;
+  }
+  const settings = DB.data.settings;
+
+  /* Сведения об устройстве. Только общие характеристики, без персональных
+     данных: случайный id устройства, браузер, ОС, экран, язык, часовой пояс. */
+  function collectDeviceInfo() {
+    const ua = navigator.userAgent;
+    const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iOS'
+      : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows'
+      : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Other';
+    const browser = /YaBrowser/.test(ua) ? 'Yandex' : /EdgA?\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera'
+      : /SamsungBrowser/.test(ua) ? 'Samsung' : /CriOS|Chrome\//.test(ua) ? 'Chrome'
+      : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Other';
+    let id = DB.data.deviceId;
+    if (!id) {
+      id = (crypto.randomUUID && crypto.randomUUID()) || Date.now().toString(36) + Math.random().toString(36).slice(2);
+      DB.data.deviceId = id;
+    }
+    return {
+      deviceId: id,
+      os,
+      browser,
+      userAgent: ua.slice(0, 300),
+      language: navigator.language || '',
+      timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone || ''),
+      screen: `${screen.width}x${screen.height}`,
+      pixelRatio: Math.round((window.devicePixelRatio || 1) * 100) / 100,
+      touch: navigator.maxTouchPoints > 0,
+      standalone: window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true,
+    };
+  }
+  DB.data.device = collectDeviceInfo();
+  DB.save();
+
+  /* Сервер рейтинга и статистики (deploy/app.py, хранит данные в JSON-файлах).
+     API_BASE — адрес сервера, например 'https://game.example.com/'.
+     Пусто — тот же сайт, откуда открыта игра. На статическом хостинге
+     (GitHub Pages) без своего сервера всё хранится только на устройстве. */
+  const API_BASE = '';
+
   const Api = {
-    online: location.protocol.startsWith('http') ? null : false, // null — ещё не проверяли
+    online: API_BASE || location.protocol.startsWith('http') ? null : false, // null — ещё не проверяли
 
     async request(path, options = {}) {
       if (this.online === false) return null;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 4000);
       try {
-        const res = await fetch('api/' + path, {
+        const res = await fetch(API_BASE + 'api/' + path, {
           ...options,
           headers: { 'Content-Type': 'application/json' },
           signal: ctrl.signal,
@@ -699,18 +823,67 @@
     submit(name, d, score) {
       return this.request('scores', { method: 'POST', body: JSON.stringify({ name, difficulty: d, score }) });
     },
+    // Кто играет: имя, устройство, настройки звука. Частые вызовы склеиваются.
+    track() {
+      clearTimeout(this.trackTimer);
+      this.trackTimer = setTimeout(() => {
+        const p = DB.player(DB.data.currentPlayer);
+        if (!p) return;
+        this.request('players', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: p.name,
+            device: DB.data.device,
+            settings,
+            difficulty: DB.data.difficulty,
+            gamesPlayed: p.gamesPlayed,
+            best: p.best,
+          }),
+        });
+      }, 1200);
+    },
   };
 
   function vibrate(pattern) {
+    if (!settings.vibration) return;
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* не поддерживается */ }
   }
+
+  /* Полноэкранный режим. На Android и в десктопных браузерах прячет панели
+     браузера. Safari на iPhone такого не позволяет — там единственный способ
+     играть без панели: добавить игру на домашний экран (см. manifest). */
+  const IS_IOS = DB.data.device.os === 'iOS';
+  const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches;
+  const Fullscreen = {
+    supported: !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen),
+    active() { return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+    enter() {
+      const el = document.documentElement;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!fn || this.active()) return;
+      try {
+        const res = fn.call(el, { navigationUI: 'hide' });
+        if (res && res.catch) res.catch(() => {});
+      } catch (e) { /* браузер отказал */ }
+    },
+    exit() {
+      const fn = document.exitFullscreen || document.webkitExitFullscreen;
+      if (fn && this.active()) { try { fn.call(document); } catch (e) { /* ignore */ } }
+    },
+    // На телефонах при старте игры сразу переходим в полноэкранный режим
+    auto() { if (IS_TOUCH && !DB.data.device.standalone) this.enter(); },
+  };
 
   /* =========================================================
      ЗВУК (Web Audio API) — всё синтезируется на лету
      ========================================================= */
+  /* Схема микшера:
+       эффекты  -> sfxBus ------------------\
+       музыка   -> musicBus -> musicFilter ---> master -> динамик
+     musicFilter приглушает музыку в меню и на паузе. */
   const Sound = {
-    ctx: null, master: null, noiseBuf: null,
-    enabled: DB.data.sound !== false,
+    ctx: null, master: null, sfxBus: null, musicBus: null, musicFilter: null, noiseBuf: null,
+    lastLand: 0,
 
     // Контекст создаётся по первому касанию (требование мобильных браузеров)
     init() {
@@ -719,17 +892,40 @@
         if (!AC) return;
         this.ctx = new AC();
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.55;
+        this.master.gain.value = 0.8;
         this.master.connect(this.ctx.destination);
-        // Буфер белого шума для взрывов и встряски
+        this.sfxBus = this.ctx.createGain();
+        this.sfxBus.connect(this.master);
+        this.musicFilter = this.ctx.createBiquadFilter();
+        this.musicFilter.type = 'lowpass';
+        this.musicFilter.frequency.value = 900;
+        this.musicFilter.connect(this.master);
+        this.musicBus = this.ctx.createGain();
+        this.musicBus.connect(this.musicFilter);
+        this.applyVolumes(true);
+        // Буфер белого шума для взрывов, встряски и ударных
         const len = this.ctx.sampleRate;
         this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
         const d = this.noiseBuf.getChannelData(0);
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        Music.start();
       }
       if (this.ctx.state === 'suspended') this.ctx.resume();
     },
-    ready() { return this.enabled && this.ctx && this.ctx.state === 'running'; },
+    // Ползунок 0..1 переводится в громкость квадратично — так регулировка ощущается ровнее
+    applyVolumes(instant) {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime, k = instant ? 0.001 : 0.05;
+      this.sfxBus.gain.setTargetAtTime(settings.sfx * settings.sfx, t, k);
+      this.musicBus.gain.setTargetAtTime(settings.music * settings.music * 0.7, t, k);
+    },
+    // Музыка «за стеной» в меню и на паузе, чистая — во время игры
+    muffle(on) {
+      if (!this.ctx) return;
+      this.musicFilter.frequency.setTargetAtTime(on ? 900 : 16000, this.ctx.currentTime, 0.3);
+    },
+    running() { return this.ctx && this.ctx.state === 'running'; },
+    ready() { return this.running() && settings.sfx > 0; },
 
     // Простой тон с огибающей и (опционально) глиссандо
     tone({ freq, to = 0, dur = 0.15, type = 'sine', vol = 0.3, delay = 0 }) {
@@ -743,7 +939,7 @@
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(this.master);
+      o.connect(g).connect(this.sfxBus);
       o.start(t);
       o.stop(t + dur + 0.03);
     },
@@ -761,9 +957,22 @@
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(vol, t);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f).connect(g).connect(this.master);
+      src.connect(f).connect(g).connect(this.sfxBus);
       src.start(t, Math.random() * 0.5);
       src.stop(t + dur + 0.03);
+    },
+
+    // Мягкий «бульк» при ударе фрукта; не чаще раза в 70 мс
+    land(power, level) {
+      const now = performance.now();
+      if (now - this.lastLand < 70) return;
+      this.lastLand = now;
+      const base = 260 - level * 14;
+      this.tone({ freq: base, to: base * 0.6, dur: 0.09, vol: Math.min(0.22, 0.05 + power * 0.025) });
+    },
+    // Короткий «свист», когда открывается окно меню
+    swoosh() {
+      this.noise({ dur: 0.18, vol: 0.06, freq: 800, to: 3000, type: 'bandpass' });
     },
 
     drop() {
@@ -799,6 +1008,111 @@
       [523, 440, 370, 294].forEach((f, i) =>
         this.tone({ freq: f, dur: 0.35, type: 'triangle', vol: 0.22, delay: i * 0.18 }));
     },
+  };
+
+  /* =========================================================
+     ФОНОВАЯ МУЗЫКА — генерируется на лету, без аудиофайлов.
+     Лёгкая мелодия в до мажоре, 100 BPM, 8 тактов по кругу:
+     аккорды C–Am–F–G, бас, колокольчики, мелодия и мягкие ударные.
+     Ноты планируются чуть заранее (look-ahead), чтобы не было рывков.
+     ========================================================= */
+  const SONG = {
+    bpm: 100,
+    chords: [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]], // C Am F G
+    bass: [48, 45, 41, 43],
+    // Мелодия по тактам: [шаг 0..15, MIDI-нота, длительность в шагах]
+    melody: [
+      [[0, 76, 2], [2, 79, 2], [4, 81, 2], [6, 79, 2], [8, 76, 3], [12, 74, 2], [14, 72, 2]],
+      [[0, 72, 2], [2, 76, 2], [4, 79, 2], [6, 76, 2], [8, 74, 4], [12, 72, 2], [14, 74, 2]],
+      [[0, 72, 2], [2, 74, 2], [4, 76, 2], [6, 79, 2], [8, 81, 3], [11, 79, 1], [12, 76, 4]],
+      [[0, 74, 2], [2, 76, 2], [4, 74, 2], [6, 71, 2], [8, 67, 6]],
+      [[0, 79, 1], [1, 81, 1], [2, 79, 2], [4, 76, 2], [6, 79, 2], [8, 84, 4], [12, 81, 2], [14, 79, 2]],
+      [[0, 81, 2], [2, 79, 2], [4, 76, 2], [6, 72, 2], [8, 76, 4], [12, 74, 2], [14, 76, 2]],
+      [[0, 77, 2], [2, 76, 2], [4, 74, 2], [6, 72, 2], [8, 69, 2], [10, 72, 2], [12, 74, 2], [14, 76, 2]],
+      [[0, 74, 3], [3, 76, 1], [4, 74, 2], [6, 71, 2], [8, 67, 2], [10, 71, 2], [12, 74, 4]],
+    ],
+  };
+
+  const Music = {
+    step: 0, nextTime: 0, timer: null,
+    stepDur: 60 / SONG.bpm / 4, // длительность шестнадцатой
+
+    start() {
+      if (this.timer) return;
+      this.step = 0;
+      this.nextTime = Sound.ctx.currentTime + 0.1;
+      this.timer = setInterval(() => this.schedule(), 25);
+    },
+    schedule() {
+      const ctx = Sound.ctx;
+      if (!Sound.running()) return;
+      // После сна вкладки не пытаемся «догнать» пропущенные ноты
+      if (this.nextTime < ctx.currentTime - 0.2) this.nextTime = ctx.currentTime + 0.05;
+      while (this.nextTime < ctx.currentTime + 0.15) {
+        if (settings.music > 0) this.playStep(this.step, this.nextTime);
+        this.nextTime += this.stepDur;
+        this.step = (this.step + 1) % (16 * SONG.melody.length);
+      }
+    },
+    playStep(i, t) {
+      const bar = Math.floor(i / 16), s = i % 16, sd = this.stepDur;
+      const chord = SONG.chords[bar % 4];
+      if (s === 0) chord.forEach((m) => this.note(t, m, sd * 16, 'sine', 0.035, 0.3));      // подклад
+      if (s === 0 || s === 8) this.note(t, SONG.bass[bar % 4], sd * 3, 'triangle', 0.16);  // бас
+      if (s === 11) this.note(t, SONG.bass[bar % 4] + 7, sd * 2, 'triangle', 0.1);
+      if (s % 4 === 2) this.note(t, chord[(s >> 2) % 3] + 24, sd * 2, 'sine', 0.025);      // колокольчики
+      for (const [st, m, len] of SONG.melody[bar]) {
+        if (st !== s) continue;
+        this.note(t, m, sd * len * 0.95, 'triangle', 0.09);
+        this.note(t, m + 12, sd * len * 0.5, 'square', 0.01);
+      }
+      if (s === 0 || s === 8) this.kick(t);
+      if (s === 4 || s === 12) this.snare(t);
+      if (s % 2 === 0) this.hat(t, s % 4 === 2 ? 0.045 : 0.02);
+      // Когда стакан переполняется — добавляем тревожный хай-хэт
+      if (state.mode === 'playing' && state.dangerTime > 0 && s % 2 === 1) this.hat(t, 0.04);
+    },
+    note(t, midi, dur, type, vol, attack = 0.01) {
+      const ctx = Sound.ctx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(dur, attack + 0.02));
+      o.connect(g).connect(Sound.musicBus);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    },
+    kick(t) {
+      const ctx = Sound.ctx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.35, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g).connect(Sound.musicBus);
+      o.start(t);
+      o.stop(t + 0.2);
+    },
+    noiseHit(t, type, freq, dur, vol) {
+      const ctx = Sound.ctx;
+      const src = ctx.createBufferSource();
+      src.buffer = Sound.noiseBuf;
+      const f = ctx.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f).connect(g).connect(Sound.musicBus);
+      src.start(t, Math.random() * 0.5);
+      src.stop(t + dur + 0.02);
+    },
+    snare(t) { this.noiseHit(t, 'bandpass', 1800, 0.12, 0.1); },
+    hat(t, vol) { this.noiseHit(t, 'highpass', 7000, 0.04, vol); },
   };
 
   /* =========================================================
@@ -1109,51 +1423,100 @@
     }
   }
 
-  // Милая рожица: глазки, ротик, румянец
-  function drawFace(ctx, f, r) {
+  /* Аниме-рожица. Параметры o:
+       expr  — normal | happy | dizzy | worried | surprised
+       blink — 0 (глаза открыты) .. 1 (закрыты)
+       lookX, lookY — куда смотрят зрачки, -1..1 */
+  function drawFace(ctx, f, r, o = {}) {
+    const expr = o.expr || 'normal';
     const ink = '#2b1610';
-    const ey = r * 0.06, ex = r * 0.33, er = r * 0.12;
-    const lw = Math.max(1, r * 0.055);
+    const ex = r * 0.34, ey = r * 0.02;   // центры глаз
+    const ew = r * 0.155, eh = r * 0.2;   // полуоси глаза
+    const lw = Math.max(1, r * 0.05);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Румянец
-    ctx.fillStyle = f.blush;
+    // Румянец с белыми штрихами, как в аниме
     for (const s of [-1, 1]) {
+      const bx = s * r * 0.58, by = r * 0.3;
       ctx.beginPath();
-      ctx.ellipse(s * r * 0.56, r * 0.27, r * 0.15, r * 0.09, 0, 0, PI2);
+      ctx.ellipse(bx, by, r * 0.15, r * 0.085, 0, 0, PI2);
+      ctx.fillStyle = f.blush;
       ctx.fill();
+      if (r > 16) {
+        ctx.beginPath();
+        for (let i = -1; i <= 1; i++) {
+          const hx = bx + i * r * 0.06;
+          ctx.moveTo(hx + r * 0.025, by - r * 0.045);
+          ctx.lineTo(hx - r * 0.025, by + r * 0.045);
+        }
+        ctx.lineWidth = Math.max(0.6, r * 0.018);
+        ctx.strokeStyle = 'rgba(255,255,255,.75)';
+        ctx.stroke();
+      }
     }
 
     // Глаза
     for (const s of [-1, 1]) {
       const x = s * ex;
-      if (f.eyes === 'happy') {
-        // Счастливые глазки-дуги ^ ^
+      if (expr === 'happy') {
+        // Довольные глазки ^ ^
         ctx.beginPath();
-        ctx.arc(x, ey + er * 0.4, er * 0.85, Math.PI * 1.15, Math.PI * 1.85);
-        ctx.lineWidth = lw * 1.15;
+        ctx.arc(x, ey + eh * 0.45, ew * 1.05, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.lineWidth = lw * 1.2;
+        ctx.strokeStyle = ink;
+        ctx.stroke();
+      } else if (expr === 'dizzy') {
+        // Зажмуренные глазки > <
+        const d = -s;
+        ctx.beginPath();
+        ctx.moveTo(x - d * ew * 0.8, ey - eh * 0.6);
+        ctx.lineTo(x + d * ew * 0.7, ey);
+        ctx.lineTo(x - d * ew * 0.8, ey + eh * 0.6);
+        ctx.lineWidth = lw * 1.2;
         ctx.strokeStyle = ink;
         ctx.stroke();
       } else {
-        ctx.beginPath();
-        ctx.ellipse(x, ey, er * 0.88, er * 1.1, 0, 0, PI2);
-        ctx.fillStyle = ink;
-        ctx.fill();
-        // Блики в глазах
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(x - er * 0.28, ey - er * 0.4, er * 0.38, 0, PI2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x + er * 0.3, ey + er * 0.38, er * 0.16, 0, PI2);
-        ctx.fill();
+        const blink = expr === 'surprised' ? 0 : o.blink || 0;
+        const k = expr === 'surprised' ? 1.12 : 1;
+        drawAnimeEye(ctx, f, x, ey, ew * k, eh * k * (1 - blink * 0.94), s, o, expr, lw);
       }
     }
 
+    // Брови «домиком» и капелька пота, когда страшно
+    if (expr === 'worried') {
+      ctx.beginPath();
+      for (const s of [-1, 1]) {
+        const x = s * ex;
+        ctx.moveTo(x - s * ew * 0.9, ey - eh * 1.55);
+        ctx.lineTo(x + s * ew * 0.8, ey - eh * 1.2);
+      }
+      ctx.lineWidth = lw * 0.9;
+      ctx.strokeStyle = ink;
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(r * 0.7, -r * 0.3);
+      const dh = r * 0.13, dw = r * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(0, -dh);
+      ctx.bezierCurveTo(dw, -dh * 0.1, dw, dh, 0, dh);
+      ctx.bezierCurveTo(-dw, dh, -dw, -dh * 0.1, 0, -dh);
+      ctx.fillStyle = 'rgba(160,215,255,.95)';
+      ctx.fill();
+      ctx.lineWidth = Math.max(0.6, r * 0.02);
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Рот
-    const my = r * 0.24;
-    if (f.mouth === 'open') {
+    const my = r * 0.25;
+    const mouth = expr === 'happy' ? 'open'
+      : expr === 'surprised' || expr === 'dizzy' ? 'o'
+      : expr === 'worried' ? 'wavy' : f.mouth;
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = ink;
+    if (mouth === 'open') {
       ctx.beginPath();
       ctx.moveTo(-r * 0.13, my);
       ctx.quadraticCurveTo(0, my + r * 0.28, r * 0.13, my);
@@ -1168,20 +1531,83 @@
       ctx.fillStyle = '#ff7f8f';
       ctx.fill();
       ctx.restore();
+    } else if (mouth === 'o') {
+      ctx.beginPath();
+      ctx.ellipse(0, my + r * 0.05, r * 0.065, r * 0.085, 0, 0, PI2);
+      ctx.fillStyle = '#5a1e14';
+      ctx.fill();
+    } else if (mouth === 'wavy') {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.13, my + r * 0.04);
+      ctx.quadraticCurveTo(-r * 0.065, my - r * 0.04, 0, my + r * 0.04);
+      ctx.quadraticCurveTo(r * 0.065, my + r * 0.12, r * 0.13, my + r * 0.04);
+      ctx.stroke();
     } else {
-      // Ротик-«w»
+      // Кошачий ротик «w»
       ctx.beginPath();
       ctx.moveTo(-r * 0.13, my - r * 0.02);
       ctx.quadraticCurveTo(-r * 0.065, my + r * 0.1, 0, my);
       ctx.quadraticCurveTo(r * 0.065, my + r * 0.1, r * 0.13, my - r * 0.02);
-      ctx.lineWidth = lw;
-      ctx.strokeStyle = ink;
       ctx.stroke();
     }
   }
 
-  // Полная отрисовка фрукта уровня lv радиусом r
-  function drawFruit(ctx, lv, r) {
+  // Большой аниме-глаз: белок, радужка с градиентом, зрачок, блики, веко с ресничкой
+  function drawAnimeEye(ctx, f, x, y, w, h, side, o, expr, lw) {
+    const ink = '#2b1610';
+    if (h < w * 0.3) {
+      // Моргание: закрытый глаз-дуга
+      ctx.beginPath();
+      ctx.moveTo(x - w, y);
+      ctx.quadraticCurveTo(x, y + w * 0.55, x + w, y);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = ink;
+      ctx.stroke();
+      return;
+    }
+    const lx = (o.lookX || 0) * w * 0.22;
+    const ly = (o.lookY || 0) * h * 0.18;
+    const small = expr === 'worried' || expr === 'surprised' ? 0.72 : 1; // испуганные зрачки меньше
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, h, 0, 0, PI2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, y - h, 0, y + h);
+    g.addColorStop(0, '#1a0b06');
+    g.addColorStop(0.55, f.line);
+    g.addColorStop(1, f.c2);
+    ctx.beginPath();
+    ctx.ellipse(x + lx, y + ly + h * 0.06, w * 0.84 * small, h * 0.9 * small, 0, 0, PI2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x + lx, y + ly + h * 0.06, w * 0.38 * small, h * 0.42 * small, 0, 0, PI2);
+    ctx.fillStyle = 'rgba(12,4,2,.85)';
+    ctx.fill();
+    // Блики
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(x - w * 0.3 + lx * 0.4, y - h * 0.36 + ly * 0.4, w * 0.34, h * 0.26, -0.3, 0, PI2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + w * 0.36 + lx * 0.4, y + h * 0.4 + ly * 0.4, w * 0.15, 0, PI2);
+    ctx.fill();
+    ctx.restore();
+    // Верхнее веко и ресничка с внешней стороны
+    ctx.beginPath();
+    ctx.ellipse(x, y, w * 1.02, h * 1.02, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.moveTo(x + side * w * 0.92, y - h * 0.4);
+    ctx.lineTo(x + side * w * 1.32, y - h * 0.72);
+    ctx.lineWidth = lw * 1.25;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+  }
+
+  /* Полная отрисовка фрукта уровня lv радиусом r.
+     face — параметры рожицы для drawFace, false — без рожицы (для спрайтов). */
+  function drawFruit(ctx, lv, r, face = {}) {
     const f = FRUITS[lv];
     ctx.save();
     drawBackDecor(ctx, f, r);
@@ -1236,12 +1662,13 @@
     ctx.fill();
 
     drawTopDecor(ctx, f, r);
-    drawFace(ctx, f, r);
+    if (face) drawFace(ctx, f, r, face);
     ctx.restore();
   }
 
-  /* Кэш спрайтов: каждый уровень фрукта рисуется один раз в offscreen-канвас
-     нужного разрешения, а потом просто копируется (быстро на мобильных). */
+  /* Кэш спрайтов: тело каждого фрукта рисуется один раз в offscreen-канвас
+     нужного разрешения и потом просто копируется (быстро на мобильных).
+     Рожица в спрайт не входит — она живая и рисуется каждый кадр. */
   const spriteCache = new Map();
   let spriteRatio = 0;
   function getSprite(lv) {
@@ -1256,7 +1683,7 @@
       const g = c.getContext('2d');
       g.translate(size / 2, size / 2);
       g.scale(pr, pr);
-      drawFruit(g, lv, r);
+      drawFruit(g, lv, r, false);
       s = { canvas: c, size: size / pr };
       spriteCache.set(lv, s);
     }
@@ -1275,7 +1702,9 @@
     btnShake: $('#btnShake'), btnBomb: $('#btnBomb'),
     next: $('#nextCanvas'), evo: $('#evo'),
     menu: $('#menu'), gameover: $('#gameover'), nameScreen: $('#nameScreen'), board: $('#board'),
-    btnPlay: $('#btnPlay'), btnNew: $('#btnNew'), btnSound: $('#btnSound'),
+    btnPlay: $('#btnPlay'), btnNew: $('#btnNew'), settings: $('#settings'),
+    volMusic: $('#volMusic'), volSfx: $('#volSfx'), volMusicVal: $('#volMusicVal'), volSfxVal: $('#volSfxVal'),
+    optVibration: $('#optVibration'), btnFullscreen: $('#btnFullscreen'), iosTip: $('#iosTip'), iosTip2: $('#iosTip2'),
     menuBest: $('#menuBest'), playerName: $('#playerName'),
     diffPicker: $('#diffPicker'), diffDesc: $('#diffDesc'),
     nameInput: $('#nameInput'), nameError: $('#nameError'),
@@ -1284,7 +1713,7 @@
     finalScore: $('#finalScore'), finalBest: $('#finalBest'), newRecord: $('#newRecord'),
     finalInfo: $('#finalInfo'), finalRank: $('#finalRank'),
   };
-  const overlays = [ui.menu, ui.gameover, ui.nameScreen, ui.board];
+  const overlays = [ui.menu, ui.gameover, ui.nameScreen, ui.board, ui.settings];
   // Параметры отображения: масштаб мира и смещение внутри канваса (в CSS-пикселях)
   const view = { dpr: 1, cw: 0, ch: 0, scale: 1, ox: 0, oy: 0 };
 
@@ -1332,6 +1761,15 @@
     b.born = state.time;
     b.merging = false;
     b.pop = pop ? 0 : 1; // прогресс анимации появления 0..1
+    // Состояние «живой» анимации: моргание, сплющивание, эмоции
+    b.anim = {
+      phase: Math.random() * PI2,
+      nextBlink: 0, blinkAt: -1e9,
+      squash: 0, squashAt: 0,
+      hurtUntil: 0,
+      happyUntil: pop ? state.time + 900 : 0,
+      idleAt: state.time + rand(5000, 12000),
+    };
     Composite.add(engine.world, b);
     return b;
   }
@@ -1349,6 +1787,24 @@
   }
   Events.on(engine, 'collisionStart', onCollision);
   Events.on(engine, 'collisionActive', onCollision);
+
+  // Удар: фрукт пружинисто сплющивается, от сильного удара жмурится, звучит «бульк»
+  function onImpact(e) {
+    for (const p of e.pairs) {
+      const a = p.bodyA, b = p.bodyB;
+      const dv = Math.hypot(a.velocity.x - b.velocity.x, a.velocity.y - b.velocity.y);
+      if (dv < 2) continue;
+      for (const body of [a, b]) {
+        if (body.label !== 'fruit' || body.merging) continue;
+        body.anim.squash = Math.min(1, dv / 9);
+        body.anim.squashAt = state.time;
+        if (dv > 6) body.anim.hurtUntil = state.time + 450;
+      }
+      const fruit = a.label === 'fruit' ? a : b;
+      if (fruit.label === 'fruit') Sound.land(dv, fruit.level);
+    }
+  }
+  Events.on(engine, 'collisionStart', onImpact);
 
   // Слияния обрабатываются после шага физики (безопасно для движка)
   function processMerges() {
@@ -1503,6 +1959,7 @@
     Sound.gameOver();
     vibrate([100, 60, 200]);
     DB.finishGame(state.player, state.difficulty, state.score);
+    Api.track();
     const isRecord = state.score > 0 && state.score > state.startBest;
     ui.finalInfo.textContent = `${state.player} · ${diff().name}`;
     ui.finalScore.textContent = state.score;
@@ -1749,6 +2206,7 @@
   }
 
   let lastFrame = performance.now();
+  let lastMuffled = null;
   let acc = 0;
   function frame(now) {
     const dt = Math.min(now - lastFrame, 100);
@@ -1761,6 +2219,9 @@
       if (n === 5) acc = 0;
     }
     if (state.mode !== 'paused' && state.mode !== 'menu') fx.update(dt / 1000);
+    // Во время игры музыка звучит чисто, в меню и на паузе — приглушённо
+    const muffled = state.mode !== 'playing';
+    if (muffled !== lastMuffled) { lastMuffled = muffled; Sound.muffle(muffled); }
     render(now);
     requestAnimationFrame(frame);
   }
@@ -1935,14 +2396,45 @@
     c.globalAlpha = 1;
   }
 
-  function drawSprite(c, lv, x, y, angle, scale) {
+  /* Фрукт с живой рожицей. sx/sy — сплющивание вдоль осей экрана
+     (применяется до поворота, поэтому фрукт «пружинит» по вертикали). */
+  function drawLiveFruit(c, lv, x, y, angle, scale, sx, sy, face) {
     const s = getSprite(lv);
     c.save();
     c.translate(x, y);
+    c.scale(scale * sx, scale * sy);
     if (angle) c.rotate(angle);
-    if (scale !== 1) c.scale(scale, scale);
     c.drawImage(s.canvas, -s.size / 2, -s.size / 2, s.size, s.size);
+    drawFace(c, FRUITS[lv], FRUITS[lv].r, face);
     c.restore();
+  }
+
+  // Моргание раз в 2–5 секунд; возвращает 0..1 (1 — глаза закрыты)
+  function blinkOf(a, now) {
+    if (now > a.nextBlink) {
+      a.blinkAt = now;
+      a.nextBlink = now + rand(2000, 5000);
+    }
+    const t = (now - a.blinkAt) / 150;
+    return t < 1 ? Math.sin(t * Math.PI) : 0;
+  }
+
+  // Выражение лица фрукта в стакане
+  function fruitFace(b, now) {
+    const a = b.anim, t = state.time;
+    let expr = 'normal';
+    if (state.mode === 'over') expr = 'dizzy';
+    else if (t < a.happyUntil) expr = 'happy';
+    else if (t < a.hurtUntil) expr = 'dizzy';
+    else if (state.bombMode) expr = 'worried';
+    else if (state.dangerTime > 0 && b.position.y - FRUITS[b.level].r < GLASS.top + 40) expr = 'worried';
+    else if (state.shakeTime > 0) expr = 'surprised';
+    else if (t > a.idleAt) {
+      // Время от времени фрукты просто радуются
+      a.happyUntil = t + 1200;
+      a.idleAt = t + rand(6000, 14000);
+    }
+    return { expr, blink: blinkOf(a, now), lookY: 0.25 };
   }
 
   function render(now) {
@@ -1977,8 +2469,14 @@
 
     // Фрукты в стакане
     for (const b of fruits) {
+      const a = b.anim;
       const s = b.pop < 1 ? 0.5 + 0.5 * easeOutBack(b.pop) : 1;
-      drawSprite(ctx, b.level, b.position.x, b.position.y, b.angle, s);
+      // Затухающие колебания после удара + лёгкое «дыхание»
+      const age = (state.time - a.squashAt) / 1000;
+      const q = a.squash * Math.exp(-age * 7) * Math.cos(age * 28);
+      const breath = Math.sin(now / 450 + a.phase) * 0.018;
+      drawLiveFruit(ctx, b.level, b.position.x, b.position.y, b.angle, s,
+        1 + q * 0.16 - breath, 1 - q * 0.16 + breath, fruitFace(b, now));
     }
 
     // Режим бомбы: пульсирующие прицелы на фруктах
@@ -1998,10 +2496,16 @@
     drawGlassFront(ctx, now);
 
     if (showDropper) {
-      const a = cur.appear;
+      // Висящий фрукт покачивается, моргает и косится в сторону движения
+      const da = cur.anim || (cur.anim = { nextBlink: 0, blinkAt: -1e9, prevX: aimX, look: 0 });
+      da.look = da.look * 0.85 + clamp((aimX - da.prevX) * 0.4, -1, 1) * 0.15;
+      da.prevX = aimX;
       const bob = Math.sin(now / 300) * 2;
+      const stretch = Math.sin(now / 300) * 0.025;
       ctx.globalAlpha = state.bombMode ? 0.35 : 1;
-      drawSprite(ctx, cur.level, aimX, DROP_Y + bob, Math.sin(now / 500) * 0.06, 0.4 + 0.6 * easeOutBack(a));
+      drawLiveFruit(ctx, cur.level, aimX, DROP_Y + bob, Math.sin(now / 500) * 0.06,
+        0.4 + 0.6 * easeOutBack(cur.appear), 1 - stretch, 1 + stretch,
+        { expr: state.bombMode ? 'worried' : 'normal', blink: blinkOf(da, now), lookX: da.look, lookY: 0.7 });
       ctx.globalAlpha = 1;
     }
 
@@ -2141,6 +2645,7 @@
 
   function showOverlay(el) {
     el.classList.add('show');
+    Sound.swoosh();
     if (el === ui.menu) drawHeroes();
     if (el === ui.gameover) drawOverHero();
   }
@@ -2158,6 +2663,7 @@
   function openMenu() {
     pause();
     hideOverlays();
+    ui.iosTip.classList.toggle('hidden', !(IS_IOS && !DB.data.device.standalone && !DB.data.iosTipClosed));
     ui.playerName.textContent = state.player;
     updateMenu();
     updateBoosters();
@@ -2193,9 +2699,29 @@
     updateMenu();
   }
 
-  function updateSoundBtn() {
-    ui.btnSound.textContent = Sound.enabled ? '🔊' : '🔇';
-    ui.btnSound.setAttribute('aria-label', Sound.enabled ? 'Выключить звук' : 'Включить звук');
+  /* --- Настройки звука и экрана --- */
+  function openSettings() {
+    hideOverlays();
+    ui.volMusic.value = Math.round(settings.music * 100);
+    ui.volSfx.value = Math.round(settings.sfx * 100);
+    ui.optVibration.checked = settings.vibration;
+    ui.btnFullscreen.classList.toggle('hidden', !Fullscreen.supported);
+    ui.btnFullscreen.textContent = Fullscreen.active() ? '⛶ Выйти из полноэкранного режима' : '⛶ На весь экран';
+    ui.iosTip2.classList.toggle('hidden', !(IS_IOS && !DB.data.device.standalone));
+    updateSliderLabels();
+    showOverlay(ui.settings);
+  }
+
+  function updateSliderLabels() {
+    for (const [input, label] of [[ui.volMusic, ui.volMusicVal], [ui.volSfx, ui.volSfxVal]]) {
+      label.textContent = input.value + '%';
+      input.style.setProperty('--val', input.value + '%');
+    }
+  }
+
+  function saveSettings() {
+    DB.save();
+    Api.track();
   }
 
   function startNewGame() {
@@ -2242,6 +2768,7 @@
       clearField();
     }
     ui.nameInput.blur();
+    Api.track();
     openMenu();
   }
 
@@ -2364,6 +2891,7 @@
   tap(ui.btnBomb, toggleBomb);
   tap(ui.btnPlay, () => {
     Sound.click();
+    Fullscreen.auto();
     if (state.mode === 'paused' && state.difficulty === DB.data.difficulty) {
       state.mode = 'playing';
       hideOverlays();
@@ -2374,14 +2902,39 @@
     }
   });
   tap(ui.btnNew, () => { Sound.click(); startNewGame(); });
-  tap(ui.btnSound, () => {
-    Sound.enabled = !Sound.enabled;
-    DB.data.sound = Sound.enabled;
-    DB.save();
-    updateSoundBtn();
+  tap($('#btnSettings'), () => { Sound.click(); openSettings(); });
+  tap($('#btnSettingsClose'), () => { Sound.click(); openMenu(); });
+  tap(ui.btnFullscreen, () => {
     Sound.click();
+    if (Fullscreen.active()) Fullscreen.exit(); else Fullscreen.enter();
+    setTimeout(openSettings, 300);
   });
-  tap($('#btnAgain'), () => { Sound.click(); startNewGame(); });
+  tap($('#btnIosTipClose'), () => {
+    DB.data.iosTipClosed = true;
+    DB.save();
+    ui.iosTip.classList.add('hidden');
+  });
+  ui.volMusic.addEventListener('input', () => {
+    Sound.init();
+    settings.music = ui.volMusic.value / 100;
+    Sound.applyVolumes();
+    updateSliderLabels();
+  });
+  ui.volSfx.addEventListener('input', () => {
+    Sound.init();
+    settings.sfx = ui.volSfx.value / 100;
+    Sound.applyVolumes();
+    updateSliderLabels();
+  });
+  // Пробный звук, когда палец отпускает ползунок эффектов
+  ui.volSfx.addEventListener('change', () => { Sound.merge(3); saveSettings(); });
+  ui.volMusic.addEventListener('change', saveSettings);
+  ui.optVibration.addEventListener('change', () => {
+    settings.vibration = ui.optVibration.checked;
+    vibrate(40);
+    saveSettings();
+  });
+  tap($('#btnAgain'), () => { Sound.click(); Fullscreen.auto(); startNewGame(); });
   tap($('#btnOverMenu'), () => { Sound.click(); openMenu(); });
   tap($('#btnChangeName'), () => { Sound.click(); openNameScreen(); });
   tap($('#btnNameOk'), () => { Sound.click(); login(ui.nameInput.value); });
@@ -2407,6 +2960,11 @@
   // Пауза при сворачивании вкладки
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && state.mode === 'playing') openMenu();
+    // В фоне музыка не играет
+    if (Sound.ctx) {
+      if (document.hidden) Sound.ctx.suspend();
+      else Sound.ctx.resume();
+    }
   });
 
   /* =========================================================
@@ -2422,19 +2980,18 @@
   if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage);
   window.addEventListener('resize', resize);
   resize();
-  updateSoundBtn();
   updateScore(false);
   updateBoosters();
   state.next = 0;
   drawNext();
   // Знакомый игрок сразу попадает в меню, новый — на экран выбора имени
-  if (state.player) openMenu(); else openNameScreen();
+  if (state.player) { openMenu(); Api.track(); } else openNameScreen();
   // Перерисовать канвасы, когда загрузится шрифт (влияет на раскладку)
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
   requestAnimationFrame(frame);
 
   // Хук для отладки из консоли
-  window.FruitMerge = { state, engine, createFruit, FRUITS, GLASS, DB, DIFFICULTIES };
+  window.FruitMerge = { state, engine, createFruit, FRUITS, GLASS, DB, DIFFICULTIES, Sound, Music, settings };
 })();
 </script>
 </body>

@@ -8,7 +8,9 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/mini-game
-Environment=FRUIT_MERGE_DB=/opt/mini-game/deploy/data/scores.json
+Environment=FRUIT_MERGE_DATA=/opt/mini-game/deploy/data
+# Сайты, с которых игре можно обращаться к API (например, GitHub Pages)
+Environment=FRUIT_MERGE_CORS=*
 ExecStart=/usr/local/bin/gunicorn -c deploy/gunicorn.conf.py
 Restart=always
 User=www-data

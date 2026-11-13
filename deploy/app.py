@@ -1,24 +1,38 @@
 """WSGI-приложение Fruit Merge.
 
-Отдаёт index.html и простой API общего рейтинга. Рейтинг хранится
-в JSON-файле (по умолчанию deploy/data/scores.json):
+Отдаёт игру (index.html, иконки, манифест) и API. Данные хранятся
+в JSON-файлах в каталоге deploy/data/ (меняется переменной FRUIT_MERGE_DATA):
 
+scores.json — общий рейтинг, лучший результат игрока на каждой сложности:
     {
       "easy":   {"марсель": {"name": "Марсель", "score": 1840, "date": "2026-11-13T22:40:00+00:00"}},
       "medium": {},
       "hard":   {}
     }
 
-Для каждого игрока на каждой сложности хранится только лучший результат.
-Имена сравниваются без учёта регистра.
+players.json — кто играет, по устройствам:
+    {
+      "<deviceId>": {
+        "deviceId": "...", "names": ["Марсель"], "lastName": "Марсель",
+        "device": {"os": "iOS", "browser": "Safari", "screen": "390x844", ...},
+        "settings": {"music": 0.5, "sfx": 0.8, "vibration": true},
+        "difficulty": "easy", "gamesPlayed": 12, "best": {"easy": 1840, ...},
+        "firstSeen": "...", "lastSeen": "...", "visits": 7
+      }
+    }
 
 API:
     GET  /api/leaderboard?difficulty=easy   -> {"difficulty": "easy", "scores": [{"name", "score"}, ...]}
-    POST /api/scores  {"name", "difficulty", "score"}  -> {"rank", "best", "record"}
-    GET  /healthz                            -> ok
+    POST /api/scores   {"name", "difficulty", "score"}           -> {"rank", "best", "record"}
+    POST /api/players  {"name", "device", "settings", ...}       -> {"ok": true}
+    GET  /healthz                                                -> ok
+
+CORS: если игра открыта с другого сайта (например, GitHub Pages), разрешённые
+источники задаются переменной FRUIT_MERGE_CORS (по умолчанию «*»).
 """
 import fcntl
 import json
+import mimetypes
 import os
 import re
 import tempfile
@@ -28,26 +42,37 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 ROOT = Path(__file__).resolve().parent.parent
-INDEX = ROOT / "index.html"
-DB_PATH = Path(os.environ.get("FRUIT_MERGE_DB", Path(__file__).resolve().parent / "data" / "scores.json"))
+DATA_DIR = Path(os.environ.get("FRUIT_MERGE_DATA", Path(__file__).resolve().parent / "data"))
+CORS_ORIGINS = [o.strip() for o in os.environ.get("FRUIT_MERGE_CORS", "*").split(",") if o.strip()]
 
 DIFFICULTIES = ("easy", "medium", "hard")
 NAME_RE = re.compile(r"^[\w .-]{2,16}$")  # \w в Python 3 — буквы любых алфавитов, цифры и _
+DEVICE_ID_RE = re.compile(r"^[\w-]{8,64}$")
 MAX_SCORE = 10_000_000
 TOP_LIMIT = 10
-MAX_BODY = 4096
+MAX_BODY = 8192
+
+# Файлы, которые сервер отдаёт как статику
+STATIC_FILES = {"/manifest.webmanifest"}
+STATIC_DIRS = ("/icons/",)
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+mimetypes.add_type("image/svg+xml", ".svg")
 
 
-class ScoreDB:
-    """Рейтинг в JSON-файле. Запись атомарная, доступ из нескольких
-    воркеров Gunicorn синхронизируется блокировкой файла."""
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class JsonStore:
+    """JSON-файл с атомарной записью. Доступ из нескольких воркеров
+    Gunicorn синхронизируется блокировкой отдельного lock-файла."""
 
     def __init__(self, path: Path):
         self.path = path
         self.lock_path = path.with_suffix(".lock")
 
     @contextmanager
-    def _locked(self):
+    def locked(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.lock_path, "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
@@ -56,52 +81,151 @@ class ScoreDB:
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
 
-    def _read(self) -> dict:
+    def read(self) -> dict:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
         except (FileNotFoundError, json.JSONDecodeError):
-            data = {}
+            return {}
+
+    def write(self, data: dict) -> None:
+        # Пишем во временный файл и подменяем — файл никогда не останется битым
+        fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix="." + self.path.stem + "-", suffix=".json")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, self.path)
+
+
+class ScoreDB(JsonStore):
+    """Общий рейтинг: лучший результат каждого игрока на каждой сложности."""
+
+    def _read_tables(self) -> dict:
+        data = self.read()
         for d in DIFFICULTIES:
             if not isinstance(data.get(d), dict):
                 data[d] = {}
         return data
-
-    def _write(self, data: dict) -> None:
-        # Пишем во временный файл и подменяем — файл никогда не останется битым
-        fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".scores-", suffix=".json")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, self.path)
 
     @staticmethod
     def _ranked(table: dict) -> list:
         return sorted(table.values(), key=lambda e: (-e["score"], e["date"]))
 
     def top(self, difficulty: str, limit: int = TOP_LIMIT) -> list:
-        with self._locked():
-            table = self._read()[difficulty]
+        with self.locked():
+            table = self._read_tables()[difficulty]
         return [{"name": e["name"], "score": e["score"]} for e in self._ranked(table)[:limit]]
 
     def submit(self, name: str, difficulty: str, score: int) -> dict:
         key = name.casefold()
-        with self._locked():
-            data = self._read()
+        with self.locked():
+            data = self._read_tables()
             table = data[difficulty]
             entry = table.get(key)
             record = entry is None or score > entry["score"]
             if record:
-                table[key] = {
-                    "name": name,
-                    "score": score,
-                    "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                }
-                self._write(data)
+                table[key] = {"name": name, "score": score, "date": now_iso()}
+                self.write(data)
             ranked = self._ranked(table)
         rank = next(i for i, e in enumerate(ranked, 1) if e["name"].casefold() == key)
         return {"rank": rank, "best": table[key]["score"], "record": record}
 
 
-db = ScoreDB(DB_PATH)
+class PlayersDB(JsonStore):
+    """Сведения об игроках по устройствам: имена, устройство, настройки звука."""
+
+    DEVICE_KEYS = {
+        "os": str, "browser": str, "userAgent": str, "language": str, "timezone": str,
+        "screen": str, "pixelRatio": (int, float), "touch": bool, "standalone": bool,
+    }
+
+    @classmethod
+    def clean_device(cls, raw) -> dict:
+        if not isinstance(raw, dict):
+            return {}
+        out = {}
+        for key, kind in cls.DEVICE_KEYS.items():
+            value = raw.get(key)
+            if isinstance(value, kind) and not (kind is not bool and isinstance(value, bool)):
+                out[key] = value[:300] if isinstance(value, str) else value
+        return out
+
+    @staticmethod
+    def clean_settings(raw) -> dict:
+        if not isinstance(raw, dict):
+            return {}
+        out = {}
+        for key in ("music", "sfx"):
+            value = raw.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                out[key] = round(min(1.0, max(0.0, float(value))), 2)
+        if isinstance(raw.get("vibration"), bool):
+            out["vibration"] = raw["vibration"]
+        return out
+
+    @staticmethod
+    def clean_best(raw) -> dict:
+        if not isinstance(raw, dict):
+            return {}
+        return {d: raw[d] for d in DIFFICULTIES
+                if isinstance(raw.get(d), int) and not isinstance(raw.get(d), bool) and 0 <= raw[d] <= MAX_SCORE}
+
+    def upsert(self, payload: dict):
+        """Возвращает None при успехе или текст ошибки."""
+        name = " ".join(str(payload.get("name", "")).split())
+        device = self.clean_device(payload.get("device"))
+        device_id = (payload.get("device") or {}).get("deviceId") if isinstance(payload.get("device"), dict) else None
+        if not NAME_RE.match(name):
+            return "invalid name"
+        if not isinstance(device_id, str) or not DEVICE_ID_RE.match(device_id):
+            return "invalid deviceId"
+        with self.locked():
+            data = self.read()
+            entry = data.get(device_id) or {"deviceId": device_id, "names": [], "firstSeen": now_iso(), "visits": 0}
+            if name not in entry["names"]:
+                entry["names"] = (entry["names"] + [name])[-20:]
+            entry["lastName"] = name
+            # Пустые поля не затирают уже сохранённые данные
+            if device:
+                entry["device"] = device
+            settings = self.clean_settings(payload.get("settings"))
+            if settings:
+                entry["settings"] = {**entry.get("settings", {}), **settings}
+            if payload.get("difficulty") in DIFFICULTIES:
+                entry["difficulty"] = payload["difficulty"]
+            games = payload.get("gamesPlayed")
+            if isinstance(games, int) and not isinstance(games, bool) and games >= 0:
+                entry["gamesPlayed"] = games
+            best = self.clean_best(payload.get("best"))
+            if best:
+                entry["best"] = {**entry.get("best", {}), **best}
+            entry["visits"] = entry.get("visits", 0) + 1
+            entry["lastSeen"] = now_iso()
+            data[device_id] = entry
+            self.write(data)
+        return None
+
+
+scores = ScoreDB(DATA_DIR / "scores.json")
+players = PlayersDB(DATA_DIR / "players.json")
+
+
+def cors_headers(environ):
+    origin = environ.get("HTTP_ORIGIN")
+    if not origin:
+        return []
+    if "*" in CORS_ORIGINS:
+        allowed = "*"
+    elif origin in CORS_ORIGINS:
+        allowed = origin
+    else:
+        return []
+    return [
+        ("Access-Control-Allow-Origin", allowed),
+        ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+        ("Access-Control-Allow-Headers", "Content-Type"),
+        ("Access-Control-Max-Age", "86400"),
+        ("Vary", "Origin"),
+    ]
 
 
 def respond(start_response, status, body, content_type="text/plain; charset=utf-8", extra=()):
@@ -113,9 +237,10 @@ def respond(start_response, status, body, content_type="text/plain; charset=utf-
     return [body]
 
 
-def respond_json(start_response, status, payload):
+def respond_json(start_response, status, payload, environ):
     body = json.dumps(payload, ensure_ascii=False)
-    return respond(start_response, status, body, "application/json; charset=utf-8", [("Cache-Control", "no-store")])
+    extra = [("Cache-Control", "no-store")] + cors_headers(environ)
+    return respond(start_response, status, body, "application/json; charset=utf-8", extra)
 
 
 def read_json(environ):
@@ -147,6 +272,17 @@ def validate_score(payload):
     return name, difficulty, score
 
 
+def static_file(path):
+    """Путь к разрешённому статическому файлу или None."""
+    file = (ROOT / path.lstrip("/")).resolve()
+    if path in STATIC_FILES:
+        allowed = file.parent == ROOT
+    else:
+        # Файл обязан лежать внутри разрешённого каталога — никаких «../»
+        allowed = any(path.startswith(d) and (ROOT / d.strip("/")).resolve() in file.parents for d in STATIC_DIRS)
+    return file if allowed and file.is_file() else None
+
+
 def application(environ, start_response):
     path = environ.get("PATH_INFO", "/")
     method = environ.get("REQUEST_METHOD", "GET")
@@ -154,25 +290,44 @@ def application(environ, start_response):
     if path == "/healthz":
         return respond(start_response, "200 OK", "ok")
 
-    if path == "/api/leaderboard" and method == "GET":
-        query = parse_qs(environ.get("QUERY_STRING", ""))
-        difficulty = query.get("difficulty", ["easy"])[0]
-        if difficulty not in DIFFICULTIES:
-            return respond_json(start_response, "400 Bad Request", {"error": "invalid difficulty"})
-        return respond_json(start_response, "200 OK", {"difficulty": difficulty, "scores": db.top(difficulty)})
-
-    if path == "/api/scores" and method == "POST":
-        result = validate_score(read_json(environ))
-        if isinstance(result, str):
-            return respond_json(start_response, "400 Bad Request", {"error": result})
-        return respond_json(start_response, "200 OK", db.submit(*result))
-
     if path.startswith("/api/"):
-        return respond_json(start_response, "404 Not Found", {"error": "not found"})
+        if method == "OPTIONS":  # preflight-запрос CORS
+            return respond(start_response, "204 No Content", b"", extra=cors_headers(environ))
 
-    if path in ("/", "/index.html") and method in ("GET", "HEAD"):
+        if path == "/api/leaderboard" and method == "GET":
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            difficulty = query.get("difficulty", ["easy"])[0]
+            if difficulty not in DIFFICULTIES:
+                return respond_json(start_response, "400 Bad Request", {"error": "invalid difficulty"}, environ)
+            return respond_json(start_response, "200 OK",
+                                {"difficulty": difficulty, "scores": scores.top(difficulty)}, environ)
+
+        if path == "/api/scores" and method == "POST":
+            result = validate_score(read_json(environ))
+            if isinstance(result, str):
+                return respond_json(start_response, "400 Bad Request", {"error": result}, environ)
+            return respond_json(start_response, "200 OK", scores.submit(*result), environ)
+
+        if path == "/api/players" and method == "POST":
+            payload = read_json(environ)
+            error = players.upsert(payload) if isinstance(payload, dict) else "invalid JSON body"
+            if error:
+                return respond_json(start_response, "400 Bad Request", {"error": error}, environ)
+            return respond_json(start_response, "200 OK", {"ok": True}, environ)
+
+        return respond_json(start_response, "404 Not Found", {"error": "not found"}, environ)
+
+    if method not in ("GET", "HEAD"):
+        return respond(start_response, "405 Method Not Allowed", "Method not allowed")
+
+    if path in ("/", "/index.html"):
         # Файл читается на каждый запрос — правки index.html подхватываются без рестарта
-        return respond(start_response, "200 OK", INDEX.read_bytes(), "text/html; charset=utf-8",
-                       [("Cache-Control", "no-cache")])
+        return respond(start_response, "200 OK", (ROOT / "index.html").read_bytes(),
+                       "text/html; charset=utf-8", [("Cache-Control", "no-cache")])
+
+    file = static_file(path)
+    if file:
+        ctype = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
+        return respond(start_response, "200 OK", file.read_bytes(), ctype, [("Cache-Control", "public, max-age=86400")])
 
     return respond(start_response, "404 Not Found", "Not found")
