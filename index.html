@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffdcc4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Fruit Merge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Физический движок -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  /* =========================================================
+     БАЗОВЫЕ СТИЛИ И ПАЛИТРА
+     ========================================================= */
+  :root {
+    --ink: #6b3626;
+    --ink-soft: #a0614b;
+    --accent: #ff7a59;
+    --accent-dark: #e2553a;
+    --panel: #fff8f2;
+    --panel-edge: #ffd6bf;
+    --shadow: 0 4px 0 rgba(196, 110, 78, .28), 0 8px 18px rgba(196, 110, 78, .18);
+    --font: 'Fredoka', 'Nunito', 'Trebuchet MS', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    font-family: var(--font);
+    color: var(--ink);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  body {
+    background-color: #ffd9c0;
+    /* Тёплый персиковый фон: мягкие пятна света + точечный узор */
+    background-image:
+      radial-gradient(circle at 15% 12%, rgba(255,255,255,.55) 0, rgba(255,255,255,0) 32%),
+      radial-gradient(circle at 88% 38%, rgba(255,240,220,.6) 0, rgba(255,240,220,0) 30%),
+      radial-gradient(circle at 20% 85%, rgba(255,180,150,.45) 0, rgba(255,180,150,0) 35%),
+      radial-gradient(rgba(255,255,255,.35) 1.6px, transparent 1.8px),
+      linear-gradient(180deg, #ffe9d8 0%, #ffd6bb 55%, #ffc6a5 100%);
+    background-size: auto, auto, auto, 22px 22px, auto;
+  }
+  button { font-family: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+
+  /* =========================================================
+     РАСКЛАДКА: шапка / бустеры / поле / эволюция
+     ========================================================= */
+  #game {
+    position: relative;
+    height: 100%;
+    height: 100dvh;
+    max-width: 520px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* --- Верхняя панель --- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 4px;
+  }
+  .icon-btn {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fff 0%, var(--panel) 100%);
+    box-shadow: var(--shadow);
+    display: grid; place-items: center;
+    transition: transform .12s ease;
+  }
+  .icon-btn svg { width: 24px; height: 24px; }
+  .icon-btn:active, .booster:active:not(:disabled) { transform: translateY(3px) scale(.96); }
+
+  .scoreboard {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+    height: 50px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ff9a6e 0%, #ff7a59 100%);
+    box-shadow: 0 4px 0 #d9563b, 0 8px 18px rgba(196,110,78,.25);
+    color: #fff;
+    overflow: hidden;
+  }
+  .score-col {
+    flex: 1 1 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    line-height: 1;
+    min-width: 0;
+  }
+  .score-col .label { font-size: 11px; font-weight: 600; letter-spacing: .08em; opacity: .9; }
+  .score-col .value { font-size: 23px; font-weight: 700; margin-top: 3px; text-shadow: 0 2px 0 rgba(160,50,25,.35); }
+  .score-col.best .value { font-size: 19px; }
+  .scoreboard .divider { width: 2px; margin: 10px 0; background: rgba(255,255,255,.4); border-radius: 2px; }
+  .bump { animation: bump .35s ease; }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+  /* --- Бустеры и превью Next --- */
+  .subbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px 0;
+  }
+  .boosters { display: flex; gap: 10px; }
+  .booster {
+    position: relative;
+    width: 70px; height: 58px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fff 0%, var(--panel) 100%);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 1px;
+    transition: transform .12s ease, opacity .2s, box-shadow .2s;
+  }
+  .booster svg { width: 30px; height: 30px; }
+  .booster .b-name { font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+  .booster .badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: 11px;
+    background: #4cc36b;
+    color: #fff; font-size: 13px; font-weight: 700;
+    display: grid; place-items: center;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,.15);
+  }
+  .booster:disabled { opacity: .5; cursor: default; }
+  .booster:disabled .badge { background: #c9a497; }
+  .booster.active {
+    background: linear-gradient(180deg, #ffe8e0 0%, #ffd0c0 100%);
+    box-shadow: 0 0 0 3px #ff6b4a, var(--shadow);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { transform: scale(1.05); } }
+
+  .next-panel {
+    display: flex; align-items: center; gap: 6px;
+    height: 58px;
+    padding: 0 8px 0 12px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fff 0%, var(--panel) 100%);
+    box-shadow: var(--shadow);
+  }
+  .next-panel .label { font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--ink-soft); }
+  .next-panel canvas { width: 50px; height: 50px; display: block; }
+
+  /* --- Игровое поле --- */
+  #stage { position: relative; flex: 1 1 auto; min-height: 0; }
+  #stage canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    touch-action: none;
+    display: block;
+  }
+
+  /* --- Полоса эволюции --- */
+  .evo {
+    padding: 4px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+  .evo-track {
+    display: flex; align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    border-radius: 18px;
+    background: rgba(255,248,242,.75);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.8), 0 4px 12px rgba(196,110,78,.15);
+  }
+  .evo-item { flex: 1 1 0; min-width: 0; position: relative; transition: opacity .3s, filter .3s; }
+  .evo-item canvas { width: 100%; aspect-ratio: 1; display: block; }
+  .evo-item.locked { opacity: .35; filter: grayscale(.7); }
+  .evo-item.current::after {
+    content: ''; position: absolute; left: 20%; right: 20%; bottom: -3px; height: 3px;
+    border-radius: 2px; background: var(--accent);
+  }
+
+  /* =========================================================
+     ОВЕРЛЕИ: меню и Game Over
+     ========================================================= */
+  .overlay {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 24px;
+    background: rgba(120, 60, 40, .35);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+  .overlay.show { display: flex; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; } }
+  .card {
+    width: 100%; max-width: 340px;
+    padding: 24px 22px 22px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, #fffdfb 0%, #fff1e6 100%);
+    box-shadow: 0 6px 0 #f0b79c, 0 20px 40px rgba(120,60,40,.3);
+    text-align: center;
+    animation: pop .4s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+  .logo {
+    font-size: 44px; font-weight: 700; line-height: .95;
+    color: #ff7a59;
+    text-shadow: 0 3px 0 #fff, 0 6px 0 #e2553a, 0 10px 14px rgba(160,60,30,.25);
+    letter-spacing: .01em;
+  }
+  .logo span { color: #4cc36b; text-shadow: 0 3px 0 #fff, 0 6px 0 #2f9a4c, 0 10px 14px rgba(40,120,60,.25); }
+  .card canvas.hero { width: 100%; max-width: 280px; height: 120px; display: block; margin: 8px auto 4px; }
+  .card h2 { font-size: 30px; font-weight: 700; color: var(--accent-dark); }
+  .card .sub { font-size: 15px; color: var(--ink-soft); margin-top: 4px; }
+  .card .big-score { font-size: 56px; font-weight: 700; color: var(--ink); line-height: 1.1; margin-top: 8px; }
+  .record-badge {
+    display: inline-block;
+    margin-top: 6px; padding: 4px 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffd84d, #ffb420);
+    color: #7a4400; font-weight: 700; font-size: 15px;
+    box-shadow: 0 3px 0 #d98f00;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .btn {
+    display: block; width: 100%;
+    margin-top: 14px; padding: 14px 18px;
+    border-radius: 20px;
+    font-size: 22px; font-weight: 700;
+    color: #fff;
+    background: linear-gradient(180deg, #6fd88a 0%, #45bb64 100%);
+    box-shadow: 0 5px 0 #2f9a4c, 0 10px 18px rgba(40,120,60,.25);
+    transition: transform .1s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #2f9a4c; }
+  .btn.secondary {
+    font-size: 18px; padding: 11px;
+    color: var(--ink);
+    background: linear-gradient(180deg, #fff 0%, #ffe9dc 100%);
+    box-shadow: 0 4px 0 #f0b79c;
+  }
+  .hidden { display: none !important; }
+  .hint { font-size: 13px; color: var(--ink-soft); margin-top: 12px; line-height: 1.35; }
+  #errorBox { position: fixed; inset: 0; display: none; place-items: center; padding: 30px; text-align: center; font-size: 18px; background: #ffe3cf; z-index: 50; }
+</style>
+</head>
+<body>
+<div id="game">
+  <!-- Верхняя панель: назад / счёт / рекорд / рестарт -->
+  <header class="topbar">
+    <button class="icon-btn" id="btnBack" aria-label="Назад">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#a0614b" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12l7.5 7.5"/></svg>
+    </button>
+    <div class="scoreboard">
+      <div class="score-col"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
+      <div class="divider"></div>
+      <div class="score-col best"><span class="label">ALL-TIME</span><span class="value" id="best">0</span></div>
+    </div>
+    <button class="icon-btn" id="btnRestart" aria-label="Начать заново">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#a0614b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 3.5v5h-5"/></svg>
+    </button>
+  </header>
+
+  <!-- Бустеры + превью следующего фрукта -->
+  <div class="subbar">
+    <div class="boosters">
+      <button class="booster" id="btnShake" aria-label="Встряска">
+        <svg viewBox="0 0 32 32">
+          <path d="M3 11c-1.5 1.8-1.5 8.2 0 10M6.5 13c-.8 1-.8 5 0 6M29 11c1.5 1.8 1.5 8.2 0 10M25.5 13c.8 1 .8 5 0 6" fill="none" stroke="#ff9a52" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 6h14l-2 21a2 2 0 0 1-2 1.8h-6A2 2 0 0 1 11 27z" fill="#d8f0ff" stroke="#5aa6d6" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="14" cy="21" r="3" fill="#ff5d6c"/><circle cx="18.5" cy="23.5" r="2.4" fill="#7ccc2e"/><circle cx="17.5" cy="17" r="2.2" fill="#5468d8"/>
+          <path d="M12 9.5h2" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="b-name">Встряска</span>
+        <span class="badge" id="shakeCount">3</span>
+      </button>
+      <button class="booster" id="btnBomb" aria-label="Бомба">
+        <svg viewBox="0 0 32 32">
+          <path d="M19.5 9.5c1-3 3.5-4.5 6-3.5" fill="none" stroke="#a0614b" stroke-width="2" stroke-linecap="round"/>
+          <path d="M26.5 2.5l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z" fill="#ffc531"/>
+          <rect x="15" y="8" width="6" height="5" rx="1.5" transform="rotate(35 18 10.5)" fill="#6b6b80"/>
+          <circle cx="14" cy="19" r="10" fill="#3d3d52"/>
+          <ellipse cx="10.5" cy="15" rx="3.2" ry="2" transform="rotate(-35 10.5 15)" fill="#fff" opacity=".45"/>
+        </svg>
+        <span class="b-name">Бомба</span>
+        <span class="badge" id="bombCount">3</span>
+      </button>
+    </div>
+    <div class="next-panel">
+      <span class="label">NEXT</span>
+      <canvas id="nextCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Игровое поле -->
+  <main id="stage"><canvas id="canvas"></canvas></main>
+
+  <!-- Эволюция фруктов -->
+  <footer class="evo"><div class="evo-track" id="evo"></div></footer>
+
+  <!-- Меню / пауза -->
+  <div class="overlay show" id="menu">
+    <div class="card">
+      <div class="logo">Fruit<br><span>Merge</span></div>
+      <canvas class="hero" id="heroCanvas"></canvas>
+      <div class="sub">Рекорд: <b id="menuBest">0</b></div>
+      <button class="btn" id="btnPlay">Играть</button>
+      <button class="btn secondary hidden" id="btnNew">Новая игра</button>
+      <button class="btn secondary" id="btnSound">🔊 Звук: вкл</button>
+      <div class="hint">Двигай фрукт пальцем и отпускай.<br>Два одинаковых фрукта сливаются в больший!</div>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div class="overlay" id="gameover">
+    <div class="card">
+      <h2>Игра окончена</h2>
+      <canvas class="hero" id="overCanvas"></canvas>
+      <div class="sub">Твой счёт</div>
+      <div class="big-score" id="finalScore">0</div>
+      <div class="record-badge hidden" id="newRecord">★ Новый рекорд! ★</div>
+      <div class="sub" id="finalBest">Рекорд: 0</div>
+      <button class="btn" id="btnAgain">Ещё раз</button>
+    </div>
+  </div>
+</div>
+<div id="errorBox">Не удалось загрузить физический движок Matter.js.<br>Проверьте подключение к интернету и обновите страницу.</div>
+
+<script>
+'use strict';
+(() => {
+  if (typeof Matter === 'undefined') {
+    document.getElementById('errorBox').style.display = 'grid';
+    return;
+  }
+  const { Engine, Bodies, Body, Composite, Events } = Matter;
+
+  /* =========================================================
+     КОНФИГУРАЦИЯ
+     ========================================================= */
+  // Логический размер мира (в единицах физики). Канвас масштабируется под экран.
+  const WORLD_W = 400;
+  const WORLD_H = 700;
+  // Внутренние границы стакана
+  const GLASS = { left: 36, right: 364, top: 190, bottom: 668, wall: 14, base: 18 };
+  const DROP_Y = 104;            // высота, на которой висит фрукт
+  const DROP_DELAY = 500;        // задержка между бросками, мс
+  const DANGER_LIMIT = 2000;     // сколько можно держаться выше края, мс
+  const SPAWN_GRACE = 900;       // столько мс свежий фрукт не учитывается в проверке Game Over
+  const MAX_SPAWN_LEVEL = 4;     // случайные фрукты — из первых 5 уровней (0..4)
+  const WATERMELON_BONUS = 1000; // бонус за слияние двух арбузов
+  const BOOSTER_EVERY = 1500;    // каждые N очков — +1 к каждому бустеру
+  const START_BOOSTERS = 3;
+  const STEP = 1000 / 60;        // фиксированный шаг физики
+  const PI2 = Math.PI * 2;
+
+  /* Цепочка из 11 фруктов.
+     r — радиус; c1/c2/c3 — светлый/основной/тёмный тон градиента; line — контур;
+     eyes/mouth — вариант рожицы; blush — цвет румянца. */
+  const FRUITS = [
+    { name: 'Черника',  type: 'blueberry',   r: 14, c1: '#a9bcff', c2: '#5a6fe0', c3: '#2d3486', line: '#232766', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,140,190,.65)' },
+    { name: 'Малина',   type: 'raspberry',   r: 18, c1: '#ffa6c3', c2: '#ee4680', c3: '#a3164a', line: '#7d1038', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,200,220,.6)' },
+    { name: 'Клубника', type: 'strawberry',  r: 23, c1: '#ffa197', c2: '#f23e3f', c3: '#a8141f', line: '#821019', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,190,200,.65)' },
+    { name: 'Лайм',     type: 'lime',        r: 28, c1: '#e0fa96', c2: '#86d236', c3: '#428e14', line: '#2f6a0c', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,130,150,.5)' },
+    { name: 'Персик',   type: 'peach',       r: 34, c1: '#ffe6c2', c2: '#ffb37c', c3: '#f2775d', line: '#c4523f', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,100,120,.45)' },
+    { name: 'Апельсин', type: 'orange',      r: 40, c1: '#ffdb85', c2: '#ffa024', c3: '#e0660b', line: '#b04c06', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,100,110,.45)' },
+    { name: 'Яблоко',   type: 'apple',       r: 47, c1: '#ffa292', c2: '#ea3a3f', c3: '#9e1220', line: '#7c0e19', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,190,200,.6)' },
+    { name: 'Гранат',   type: 'pomegranate', r: 54, c1: '#ff98ad', c2: '#c8254f', c3: '#7a0a2a', line: '#5c0820', eyes: 'happy', mouth: 'smile', blush: 'rgba(255,190,210,.55)' },
+    { name: 'Кокос',    type: 'coconut',     r: 61, c1: '#d3a47c', c2: '#8f5e39', c3: '#56351d', line: '#3f2614', eyes: 'dot',   mouth: 'open',  blush: 'rgba(255,150,150,.5)' },
+    { name: 'Ананас',   type: 'pineapple',   r: 68, c1: '#fff3a3', c2: '#ffcc33', c3: '#e39c0b', line: '#a86f05', eyes: 'dot',   mouth: 'smile', blush: 'rgba(255,120,120,.5)' },
+    { name: 'Арбуз',    type: 'watermelon',  r: 77, c1: '#b2f293', c2: '#48bb3c', c3: '#1f7a22', line: '#145a17', eyes: 'happy', mouth: 'open',  blush: 'rgba(255,130,150,.6)' },
+  ];
+  const LAST_LEVEL = FRUITS.length - 1;
+  // Очки за создание фрукта уровня n: растут с уровнем (треугольные числа × 2)
+  const MERGE_POINTS = FRUITS.map((_, n) => n * (n + 1));
+
+  /* =========================================================
+     УТИЛИТЫ
+     ========================================================= */
+  const $ = (s) => document.querySelector(s);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+  const easeOutBack = (t) => { const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+
+  // Детерминированный ГПСЧ — чтобы текстуры фруктов не «прыгали» при перерисовке
+  function seeded(seed) {
+    return () => {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function starPath(ctx, x, y, points, rOut, rIn, rot = -Math.PI / 2) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const rr = i % 2 ? rIn : rOut;
+      const a = rot + (i * Math.PI) / points;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+
+  const storage = {
+    get(key, def) { try { const v = localStorage.getItem(key); return v === null ? def : JSON.parse(v); } catch (e) { return def; } },
+    set(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* приватный режим */ } },
+  };
+
+  function vibrate(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* не поддерживается */ }
+  }
+
+  /* =========================================================
+     ЗВУК (Web Audio API) — всё синтезируется на лету
+     ========================================================= */
+  const Sound = {
+    ctx: null, master: null, noiseBuf: null,
+    enabled: storage.get('fruitMerge.sound', true),
+
+    // Контекст создаётся по первому касанию (требование мобильных браузеров)
+    init() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.55;
+        this.master.connect(this.ctx.destination);
+        // Буфер белого шума для взрывов и встряски
+        const len = this.ctx.sampleRate;
+        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    },
+    ready() { return this.enabled && this.ctx && this.ctx.state === 'running'; },
+
+    // Простой тон с огибающей и (опционально) глиссандо
+    tone({ freq, to = 0, dur = 0.15, type = 'sine', vol = 0.3, delay = 0 }) {
+      if (!this.ready()) return;
+      const t = this.ctx.currentTime + delay;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + dur + 0.03);
+    },
+
+    // Фильтрованный шум
+    noise({ dur = 0.3, vol = 0.3, freq = 1000, to = 0, type = 'lowpass', delay = 0 }) {
+      if (!this.ready()) return;
+      const t = this.ctx.currentTime + delay;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter();
+      f.type = type;
+      f.frequency.setValueAtTime(freq, t);
+      if (to) f.frequency.exponentialRampToValueAtTime(to, t + dur);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f).connect(g).connect(this.master);
+      src.start(t, Math.random() * 0.5);
+      src.stop(t + dur + 0.03);
+    },
+
+    drop() {
+      this.tone({ freq: 640, to: 280, dur: 0.13, vol: 0.28 });
+      this.noise({ dur: 0.06, vol: 0.08, freq: 2500, type: 'highpass' });
+    },
+    // Чем выше уровень — тем выше и «богаче» звук
+    merge(level) {
+      const base = 300 * Math.pow(1.11, level);
+      this.tone({ freq: base, to: base * 2, dur: 0.1, vol: 0.32 });
+      this.tone({ freq: base * 1.5, dur: 0.22, type: 'triangle', vol: 0.22, delay: 0.06 });
+      this.tone({ freq: base * 2, dur: 0.3, vol: 0.12, delay: 0.11 });
+      this.noise({ dur: 0.08, vol: 0.1, freq: 4000, type: 'highpass' });
+    },
+    watermelon() {
+      [523, 659, 784, 1047, 1319, 1568].forEach((f, i) =>
+        this.tone({ freq: f, dur: 0.35, type: 'triangle', vol: 0.22, delay: i * 0.07 }));
+    },
+    bomb() {
+      this.noise({ dur: 0.7, vol: 0.7, freq: 1200, to: 60 });
+      this.tone({ freq: 160, to: 38, dur: 0.55, vol: 0.55 });
+    },
+    shake() {
+      for (let i = 0; i < 5; i++) this.noise({ dur: 0.12, vol: 0.22, freq: 600, delay: i * 0.12 });
+      this.tone({ freq: 90, to: 60, dur: 0.6, type: 'triangle', vol: 0.2 });
+    },
+    bonus() {
+      this.tone({ freq: 880, dur: 0.12, type: 'square', vol: 0.08 });
+      this.tone({ freq: 1320, dur: 0.2, type: 'square', vol: 0.08, delay: 0.1 });
+    },
+    click() { this.tone({ freq: 900, to: 1200, dur: 0.06, vol: 0.12 }); },
+    gameOver() {
+      [523, 440, 370, 294].forEach((f, i) =>
+        this.tone({ freq: f, dur: 0.35, type: 'triangle', vol: 0.22, delay: i * 0.18 }));
+    },
+  };
+
+  /* =========================================================
+     ОТРИСОВКА ФРУКТОВ (kawaii)
+     Каждый фрукт рисуется вокруг (0,0) с радиусом r.
+     ========================================================= */
+
+  // Листик: растёт из (x,y) в направлении угла ang
+  function leaf(ctx, x, y, len, wid, ang, c1 = '#7ad84a', c2 = '#2f8f22') {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    const g = ctx.createLinearGradient(0, -wid, 0, wid);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(len * 0.45, -wid, len, 0);
+    ctx.quadraticCurveTo(len * 0.45, wid, 0, 0);
+    ctx.closePath();
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = Math.max(0.8, len * 0.06);
+    ctx.strokeStyle = 'rgba(20,80,20,.55)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(len * 0.12, 0);
+    ctx.lineTo(len * 0.78, 0);
+    ctx.lineWidth = Math.max(0.6, len * 0.045);
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Короткий изогнутый черенок
+  function stem(ctx, r, x0, y0, x1, y1, color = '#8a5a2b') {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(x0 - r * 0.02, (y0 + y1) / 2, x1, y1);
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1.4, r * 0.09);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+
+  // Элементы, которые рисуются ПОЗАДИ тела фрукта
+  function drawBackDecor(ctx, f, r) {
+    if (f.type === 'pineapple') {
+      // Хохолок ананаса: веер острых листьев
+      const leaves = [
+        [-2.45, 0.42], [-0.69, 0.42], [-2.2, 0.55], [-0.94, 0.55],
+        [-1.92, 0.7], [-1.22, 0.7], [-1.57, 0.82],
+      ];
+      for (const [a, l] of leaves) leaf(ctx, 0, -r * 0.72, r * l, r * 0.15, a, '#74d64a', '#258a2a');
+    }
+  }
+
+  // Текстуры, которые рисуются внутри круга (контекст уже обрезан по кругу)
+  function drawTexture(ctx, f, r, lv) {
+    const rnd = seeded(lv * 977 + 13);
+    switch (f.type) {
+      case 'blueberry': {
+        // Лёгкий восковой налёт
+        for (let i = 0; i < 18; i++) {
+          ctx.beginPath();
+          ctx.arc(rand2(rnd, r), rand2(rnd, r), r * 0.05, 0, PI2);
+          ctx.fillStyle = 'rgba(220,230,255,.18)';
+          ctx.fill();
+        }
+        break;
+      }
+      case 'raspberry': {
+        // Костяночки в шахматном порядке
+        const s = r * 0.33;
+        for (let row = 0, y = -r; y <= r + s; y += s * 0.9, row++) {
+          for (let x = -r + (row % 2) * s * 0.5; x <= r + s; x += s) {
+            ctx.beginPath();
+            ctx.arc(x, y, s * 0.5, 0, PI2);
+            ctx.fillStyle = 'rgba(255,255,255,.12)';
+            ctx.fill();
+            ctx.lineWidth = r * 0.035;
+            ctx.strokeStyle = 'rgba(120,0,45,.3)';
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x - s * 0.15, y - s * 0.17, s * 0.12, 0, PI2);
+            ctx.fillStyle = 'rgba(255,255,255,.4)';
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'strawberry': {
+        // Семечки, обходим зону рожицы
+        const s = r * 0.34;
+        for (let row = 0, y = -r * 0.7; y <= r; y += s * 0.85, row++) {
+          for (let x = -r + (row % 2) * s * 0.5; x <= r; x += s) {
+            if (Math.abs(x) < r * 0.66 && y > -r * 0.22 && y < r * 0.45) continue;
+            ctx.beginPath();
+            ctx.ellipse(x, y, r * 0.045, r * 0.07, 0, 0, PI2);
+            ctx.fillStyle = '#ffe58a';
+            ctx.fill();
+            ctx.lineWidth = r * 0.015;
+            ctx.strokeStyle = 'rgba(160,80,0,.5)';
+            ctx.stroke();
+          }
+        }
+        break;
+      }
+      case 'lime':
+      case 'orange': {
+        // Поры кожуры
+        const n = f.type === 'lime' ? 40 : 70;
+        for (let i = 0; i < n; i++) {
+          ctx.beginPath();
+          ctx.arc(rand2(rnd, r), rand2(rnd, r), r * 0.025, 0, PI2);
+          ctx.fillStyle = rnd() < 0.5 ? 'rgba(255,255,255,.28)' : 'rgba(120,60,0,.14)';
+          ctx.fill();
+        }
+        break;
+      }
+      case 'peach': {
+        // Розовый бочок и бороздка
+        const g = ctx.createRadialGradient(r * 0.5, r * 0.15, 0, r * 0.5, r * 0.15, r * 0.95);
+        g.addColorStop(0, 'rgba(255,90,110,.45)');
+        g.addColorStop(1, 'rgba(255,90,110,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.02, -r * 0.98);
+        ctx.bezierCurveTo(-r * 0.55, -r * 0.6, -r * 0.7, r * 0.1, -r * 0.5, r * 0.7);
+        ctx.lineWidth = r * 0.05;
+        ctx.strokeStyle = 'rgba(200,80,60,.28)';
+        ctx.stroke();
+        break;
+      }
+      case 'apple': {
+        // Жёлтый отблеск снизу и светлые штрихи
+        const g = ctx.createRadialGradient(r * 0.4, r * 0.6, 0, r * 0.4, r * 0.6, r * 0.8);
+        g.addColorStop(0, 'rgba(255,210,90,.35)');
+        g.addColorStop(1, 'rgba(255,210,90,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+        for (let i = 0; i < 12; i++) {
+          const x = rand2(rnd, r), y = rand2(rnd, r);
+          ctx.beginPath();
+          ctx.ellipse(x, y, r * 0.015, r * 0.1, 0, 0, PI2);
+          ctx.fillStyle = 'rgba(255,230,160,.22)';
+          ctx.fill();
+        }
+        break;
+      }
+      case 'pomegranate': {
+        for (let i = 0; i < 30; i++) {
+          ctx.beginPath();
+          ctx.arc(rand2(rnd, r), rand2(rnd, r), r * 0.03, 0, PI2);
+          ctx.fillStyle = 'rgba(255,200,210,.25)';
+          ctx.fill();
+        }
+        break;
+      }
+      case 'coconut': {
+        // Волокна скорлупы
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 90; i++) {
+          const x = rand2(rnd, r), y = rand2(rnd, r);
+          const a = rnd() * PI2, l = r * (0.08 + rnd() * 0.12);
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+          ctx.lineWidth = r * 0.025;
+          ctx.strokeStyle = rnd() < 0.6 ? 'rgba(50,28,12,.35)' : 'rgba(240,200,160,.28)';
+          ctx.stroke();
+        }
+        // Три «глазка» кокоса
+        for (const [x, y] of [[-0.14, -0.66], [0.14, -0.66], [0, -0.82]]) {
+          ctx.beginPath();
+          ctx.ellipse(x * r, y * r, r * 0.065, r * 0.05, 0, 0, PI2);
+          ctx.fillStyle = 'rgba(45,25,10,.75)';
+          ctx.fill();
+        }
+        break;
+      }
+      case 'pineapple': {
+        // Ромбическая сетка: квадратная решётка, повёрнутая на 45°
+        ctx.save();
+        ctx.rotate(Math.PI / 4);
+        const s = r * 0.38;
+        ctx.lineWidth = r * 0.045;
+        ctx.strokeStyle = 'rgba(170,100,0,.5)';
+        for (let k = -2 * r; k <= 2 * r; k += s) {
+          ctx.beginPath(); ctx.moveTo(k, -2 * r); ctx.lineTo(k, 2 * r); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-2 * r, k); ctx.lineTo(2 * r, k); ctx.stroke();
+        }
+        for (let x = -2 * r; x <= 2 * r; x += s) {
+          for (let y = -2 * r; y <= 2 * r; y += s) {
+            ctx.beginPath();
+            ctx.arc(x + s / 2, y + s / 2, r * 0.035, 0, PI2);
+            ctx.fillStyle = 'rgba(160,90,0,.45)';
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+        break;
+      }
+      case 'watermelon': {
+        // Тёмно-зелёные зигзагообразные полосы, огибающие шар
+        ctx.lineWidth = r * 0.12;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(25,105,30,.85)';
+        for (let i = -3; i <= 3; i++) {
+          const base = i * 0.3;
+          ctx.beginPath();
+          for (let t = -1.05; t <= 1.05; t += 0.05) {
+            const w = Math.sqrt(Math.max(0, 1 - t * t));
+            const x = base * r * w + Math.sin(t * 16 + i) * r * 0.05 * (0.4 + w);
+            const y = t * r;
+            if (t === -1.05) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+        break;
+      }
+    }
+  }
+  const rand2 = (rnd, r) => (rnd() * 2 - 1) * r;
+
+  // Элементы ПОВЕРХ тела: листики, черенки, корона
+  function drawTopDecor(ctx, f, r) {
+    switch (f.type) {
+      case 'blueberry': {
+        // Звёздочка-«корона» черники
+        starPath(ctx, 0, -r * 0.8, 5, r * 0.26, r * 0.11);
+        ctx.fillStyle = f.c3;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.8, r * 0.08, 0, PI2);
+        ctx.fillStyle = '#1a1d55';
+        ctx.fill();
+        break;
+      }
+      case 'raspberry':
+        stem(ctx, r, 0, -r * 0.88, r * 0.05, -r * 1.12, '#4f9a2a');
+        leaf(ctx, 0, -r * 0.9, r * 0.42, r * 0.15, -2.6);
+        leaf(ctx, 0, -r * 0.9, r * 0.42, r * 0.15, -0.54);
+        break;
+      case 'strawberry':
+        // Чашелистик из пяти листиков + хвостик
+        stem(ctx, r, 0, -r * 0.82, r * 0.06, -r * 1.18, '#3f8f22');
+        for (const a of [2.75, -2.65, -1.57, -0.49, 0.39]) {
+          leaf(ctx, 0, -r * 0.82, r * 0.52, r * 0.17, a);
+        }
+        break;
+      case 'lime':
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.94, r * 0.1, 0, PI2);
+        ctx.fillStyle = '#7f9a28';
+        ctx.fill();
+        leaf(ctx, r * 0.04, -r * 0.94, r * 0.5, r * 0.18, -0.55);
+        break;
+      case 'peach':
+        stem(ctx, r, 0, -r * 0.9, r * 0.04, -r * 1.1);
+        leaf(ctx, r * 0.04, -r * 1.02, r * 0.58, r * 0.2, -0.45);
+        break;
+      case 'orange':
+        starPath(ctx, 0, -r * 0.9, 5, r * 0.13, r * 0.06);
+        ctx.fillStyle = '#4c9a28';
+        ctx.fill();
+        leaf(ctx, r * 0.06, -r * 0.94, r * 0.5, r * 0.18, -0.4);
+        break;
+      case 'apple':
+        stem(ctx, r, 0, -r * 0.78, r * 0.1, -r * 1.17);
+        leaf(ctx, r * 0.07, -r * 1.02, r * 0.52, r * 0.2, -0.3);
+        break;
+      case 'pomegranate': {
+        // Корона граната
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.22, -r * 0.84);
+        ctx.lineTo(-r * 0.28, -r * 1.14);
+        ctx.lineTo(-r * 0.13, -r * 1.0);
+        ctx.lineTo(0, -r * 1.2);
+        ctx.lineTo(r * 0.13, -r * 1.0);
+        ctx.lineTo(r * 0.28, -r * 1.14);
+        ctx.lineTo(r * 0.22, -r * 0.84);
+        ctx.closePath();
+        const g = ctx.createLinearGradient(0, -r * 1.2, 0, -r * 0.84);
+        g.addColorStop(0, '#e2456c');
+        g.addColorStop(1, f.c3);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.lineWidth = r * 0.04;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = f.line;
+        ctx.stroke();
+        break;
+      }
+      case 'watermelon': {
+        // Закрученный хвостик
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.96);
+        ctx.bezierCurveTo(r * 0.02, -r * 1.12, r * 0.2, -r * 1.14, r * 0.17, -r * 1.02);
+        ctx.bezierCurveTo(r * 0.14, -r * 0.94, r * 0.06, -r * 1.02, r * 0.12, -r * 1.08);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = r * 0.06;
+        ctx.strokeStyle = '#5a8a22';
+        ctx.stroke();
+        break;
+      }
+    }
+  }
+
+  // Милая рожица: глазки, ротик, румянец
+  function drawFace(ctx, f, r) {
+    const ink = '#2b1610';
+    const ey = r * 0.06, ex = r * 0.33, er = r * 0.12;
+    const lw = Math.max(1, r * 0.055);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Румянец
+    ctx.fillStyle = f.blush;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * r * 0.56, r * 0.27, r * 0.15, r * 0.09, 0, 0, PI2);
+      ctx.fill();
+    }
+
+    // Глаза
+    for (const s of [-1, 1]) {
+      const x = s * ex;
+      if (f.eyes === 'happy') {
+        // Счастливые глазки-дуги ^ ^
+        ctx.beginPath();
+        ctx.arc(x, ey + er * 0.4, er * 0.85, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.lineWidth = lw * 1.15;
+        ctx.strokeStyle = ink;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(x, ey, er * 0.88, er * 1.1, 0, 0, PI2);
+        ctx.fillStyle = ink;
+        ctx.fill();
+        // Блики в глазах
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x - er * 0.28, ey - er * 0.4, er * 0.38, 0, PI2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + er * 0.3, ey + er * 0.38, er * 0.16, 0, PI2);
+        ctx.fill();
+      }
+    }
+
+    // Рот
+    const my = r * 0.24;
+    if (f.mouth === 'open') {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.13, my);
+      ctx.quadraticCurveTo(0, my + r * 0.28, r * 0.13, my);
+      ctx.closePath();
+      ctx.fillStyle = '#5a1e14';
+      ctx.fill();
+      // Язычок
+      ctx.save();
+      ctx.clip();
+      ctx.beginPath();
+      ctx.ellipse(0, my + r * 0.15, r * 0.08, r * 0.06, 0, 0, PI2);
+      ctx.fillStyle = '#ff7f8f';
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // Ротик-«w»
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.13, my - r * 0.02);
+      ctx.quadraticCurveTo(-r * 0.065, my + r * 0.1, 0, my);
+      ctx.quadraticCurveTo(r * 0.065, my + r * 0.1, r * 0.13, my - r * 0.02);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = ink;
+      ctx.stroke();
+    }
+  }
+
+  // Полная отрисовка фрукта уровня lv радиусом r
+  function drawFruit(ctx, lv, r) {
+    const f = FRUITS[lv];
+    ctx.save();
+    drawBackDecor(ctx, f, r);
+
+    // Тело с мягким радиальным градиентом
+    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.42, r * 0.08, 0, 0, r * 1.05);
+    g.addColorStop(0, f.c1);
+    g.addColorStop(0.55, f.c2);
+    g.addColorStop(1, f.c3);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, PI2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Текстура внутри круга
+    ctx.save();
+    ctx.clip();
+    drawTexture(ctx, f, r, lv);
+    // Мягкая внутренняя тень снизу-справа для объёма
+    const sh = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.6, 0, 0, r * 1.1);
+    sh.addColorStop(0, 'rgba(0,0,0,0)');
+    sh.addColorStop(1, 'rgba(60,10,0,.18)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+
+    // Контур
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, PI2);
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.strokeStyle = f.line;
+    ctx.globalAlpha = 0.6;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Глянцевый блик
+    ctx.save();
+    ctx.translate(-r * 0.4, -r * 0.5);
+    ctx.rotate(-0.6);
+    ctx.scale(1, 0.55);
+    const hg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.34);
+    hg.addColorStop(0, 'rgba(255,255,255,.9)');
+    hg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.34, 0, PI2);
+    ctx.fillStyle = hg;
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(-r * 0.7, -r * 0.1, r * 0.055, 0, PI2);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fill();
+
+    drawTopDecor(ctx, f, r);
+    drawFace(ctx, f, r);
+    ctx.restore();
+  }
+
+  /* Кэш спрайтов: каждый уровень фрукта рисуется один раз в offscreen-канвас
+     нужного разрешения, а потом просто копируется (быстро на мобильных). */
+  const spriteCache = new Map();
+  let spriteRatio = 0;
+  function getSprite(lv) {
+    const pr = view.dpr * view.scale;
+    if (pr !== spriteRatio) { spriteCache.clear(); spriteRatio = pr; }
+    let s = spriteCache.get(lv);
+    if (!s) {
+      const r = FRUITS[lv].r;
+      const size = Math.ceil(r * 3.2 * pr);
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const g = c.getContext('2d');
+      g.translate(size / 2, size / 2);
+      g.scale(pr, pr);
+      drawFruit(g, lv, r);
+      s = { canvas: c, size: size / pr };
+      spriteCache.set(lv, s);
+    }
+    return s;
+  }
+
+  /* =========================================================
+     DOM И ВИД
+     ========================================================= */
+  const canvas = $('#canvas');
+  const ctx = canvas.getContext('2d');
+  const stage = $('#stage');
+  const ui = {
+    score: $('#score'), best: $('#best'),
+    shakeCount: $('#shakeCount'), bombCount: $('#bombCount'),
+    btnShake: $('#btnShake'), btnBomb: $('#btnBomb'),
+    next: $('#nextCanvas'), evo: $('#evo'),
+    menu: $('#menu'), gameover: $('#gameover'),
+    btnPlay: $('#btnPlay'), btnNew: $('#btnNew'), btnSound: $('#btnSound'),
+    menuBest: $('#menuBest'),
+    finalScore: $('#finalScore'), finalBest: $('#finalBest'), newRecord: $('#newRecord'),
+  };
+  // Параметры отображения: масштаб мира и смещение внутри канваса (в CSS-пикселях)
+  const view = { dpr: 1, cw: 0, ch: 0, scale: 1, ox: 0, oy: 0 };
+
+  /* =========================================================
+     ФИЗИКА
+     ========================================================= */
+  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
+  engine.gravity.y = 1.1;
+
+  // Стенки стакана. Боковые продлены высоко вверх — фрукты не вылетят при встряске.
+  (function buildGlass() {
+    const opts = { isStatic: true, friction: 0.25, restitution: 0.1, label: 'wall' };
+    const top = -1200, bottom = GLASS.bottom + 120, h = bottom - top;
+    Composite.add(engine.world, [
+      Bodies.rectangle(GLASS.left - 60, top + h / 2, 120, h, opts),
+      Bodies.rectangle(GLASS.right + 60, top + h / 2, 120, h, opts),
+      Bodies.rectangle(WORLD_W / 2, GLASS.bottom + 60, WORLD_W + 400, 120, opts),
+    ]);
+  })();
+
+  function getFruits() {
+    return Composite.allBodies(engine.world).filter((b) => b.label === 'fruit');
+  }
+
+  function createFruit(level, x, y, pop = false) {
+    const r = FRUITS[level].r;
+    const b = Bodies.circle(x, y, r, {
+      label: 'fruit',
+      restitution: 0.15,
+      friction: 0.2,
+      frictionStatic: 0.5,
+      frictionAir: 0.006,
+      density: 0.0012,
+      slop: 0.03,
+    });
+    b.level = level;
+    b.born = state.time;
+    b.merging = false;
+    b.pop = pop ? 0 : 1; // прогресс анимации появления 0..1
+    Composite.add(engine.world, b);
+    return b;
+  }
+
+  // Отслеживаем касания одинаковых фруктов
+  const mergeQueue = [];
+  function onCollision(e) {
+    for (const p of e.pairs) {
+      const a = p.bodyA, b = p.bodyB;
+      if (a.label !== 'fruit' || b.label !== 'fruit') continue;
+      if (a.level !== b.level || a.merging || b.merging) continue;
+      a.merging = b.merging = true;
+      mergeQueue.push([a, b]);
+    }
+  }
+  Events.on(engine, 'collisionStart', onCollision);
+  Events.on(engine, 'collisionActive', onCollision);
+
+  // Слияния обрабатываются после шага физики (безопасно для движка)
+  function processMerges() {
+    while (mergeQueue.length) {
+      const [a, b] = mergeQueue.shift();
+      const lv = a.level;
+      const x = (a.position.x + b.position.x) / 2;
+      const y = (a.position.y + b.position.y) / 2;
+      const vx = (a.velocity.x + b.velocity.x) / 2;
+      const vy = (a.velocity.y + b.velocity.y) / 2;
+      Composite.remove(engine.world, [a, b]);
+
+      if (lv === LAST_LEVEL) {
+        // Два арбуза — исчезают с большим бонусом
+        fx.flash(x, y, FRUITS[lv].r * 1.6, '#fff6a0');
+        fx.burst(x, y, lv, 70, 3.2);
+        fx.burst(x, y, 4, 30, 2.5);
+        fx.cameraShake(14, 600);
+        addScore(WATERMELON_BONUS, x, y, 'АРБУЗ! +' + WATERMELON_BONUS);
+        state.shakes++; state.bombs++;
+        fx.popup(WORLD_W / 2, GLASS.top + 60, '+1 бустер', '#4cc36b', 22);
+        Sound.watermelon();
+        vibrate([60, 40, 120]);
+        updateBoosters();
+        continue;
+      }
+
+      const nl = lv + 1;
+      const r = FRUITS[nl].r;
+      const nx = clamp(x, GLASS.left + r, GLASS.right - r);
+      const ny = Math.min(y, GLASS.bottom - r);
+      const nb = createFruit(nl, nx, ny, true);
+      Body.setVelocity(nb, { x: vx, y: vy });
+
+      fx.flash(nx, ny, r, FRUITS[nl].c1);
+      fx.burst(nx, ny, nl, 14 + nl * 3, 1.4 + nl * 0.15);
+      if (nl >= 7) fx.cameraShake(4 + nl, 250);
+      addScore(MERGE_POINTS[nl], nx, ny - r);
+      Sound.merge(nl);
+      vibrate(18 + nl * 6);
+      if (nl > state.maxLevel) { state.maxLevel = nl; updateEvolution(); }
+    }
+  }
+
+  /* =========================================================
+     СОСТОЯНИЕ ИГРЫ
+     ========================================================= */
+  const state = {
+    mode: 'menu',          // menu | playing | paused | over
+    score: 0,
+    best: storage.get('fruitMerge.best', 0),
+    time: 0,               // игровое время в мс (не идёт на паузе)
+    current: null,         // { level, appear } — висящий фрукт
+    next: 0,
+    aimX: WORLD_W / 2,
+    aiming: false,
+    dropTimer: 0,
+    dropsMade: 0,
+    dangerTime: 0,
+    shakeTime: 0, shakeKick: 0, safeTime: 0,
+    shakes: START_BOOSTERS,
+    bombs: START_BOOSTERS,
+    bombMode: false,
+    maxLevel: MAX_SPAWN_LEVEL,
+    nextBonus: BOOSTER_EVERY,
+  };
+
+  // Первые броски — маленькие фрукты, затем случайно из 5 уровней
+  function randomLevel() {
+    state.dropsMade++;
+    return state.dropsMade <= 2 ? (Math.random() * 3) | 0 : (Math.random() * (MAX_SPAWN_LEVEL + 1)) | 0;
+  }
+
+  function clampAim(x, lv) {
+    const r = FRUITS[lv].r;
+    return clamp(x, GLASS.left + r + 1, GLASS.right - r - 1);
+  }
+
+  function spawnCurrent() {
+    state.current = { level: state.next, appear: 0 };
+    state.next = randomLevel();
+    drawNext();
+  }
+
+  function dropFruit() {
+    if (state.mode !== 'playing' || !state.current || state.bombMode) return;
+    const lv = state.current.level;
+    const x = clampAim(state.aimX, lv);
+    const b = createFruit(lv, x, DROP_Y);
+    Body.setVelocity(b, { x: 0, y: 3 });
+    Body.setAngularVelocity(b, rand(-0.02, 0.02));
+    state.current = null;
+    state.dropTimer = DROP_DELAY;
+    Sound.drop();
+  }
+
+  function addScore(pts, x, y, label) {
+    state.score += pts;
+    fx.popup(x, y, label || '+' + pts, label ? '#ff5a3c' : '#ffffff', label ? 30 : 16 + Math.min(14, pts / 8));
+    if (state.score > state.best) {
+      state.best = state.score;
+      storage.set('fruitMerge.best', state.best);
+    }
+    // Награда бустерами за набранные очки
+    while (state.score >= state.nextBonus) {
+      state.nextBonus += BOOSTER_EVERY;
+      state.shakes++; state.bombs++;
+      fx.popup(WORLD_W / 2, GLASS.top + 30, 'Бонус: +1 бустер', '#4cc36b', 20);
+      Sound.bonus();
+      updateBoosters();
+    }
+    updateScore(true);
+  }
+
+  function resetGame() {
+    Composite.clear(engine.world, true); // оставляем только стенки
+    mergeQueue.length = 0;
+    fx.clear();
+    Object.assign(state, {
+      mode: 'playing', score: 0, time: 0, dropsMade: 0,
+      dropTimer: 0, dangerTime: 0, shakeTime: 0, safeTime: 0,
+      shakes: START_BOOSTERS, bombs: START_BOOSTERS, bombMode: false,
+      maxLevel: MAX_SPAWN_LEVEL, nextBonus: BOOSTER_EVERY, aiming: false,
+    });
+    state.next = randomLevel();
+    spawnCurrent();
+    hideOverlays();
+    updateScore(false);
+    updateBoosters();
+    updateEvolution();
+  }
+
+  function gameOver() {
+    state.mode = 'over';
+    state.bombMode = false;
+    state.aiming = false;
+    Sound.gameOver();
+    vibrate([100, 60, 200]);
+    const isRecord = state.score > 0 && state.score >= state.best && state.score > state.startBest;
+    storage.set('fruitMerge.best', state.best);
+    ui.finalScore.textContent = state.score;
+    ui.finalBest.textContent = 'Рекорд: ' + state.best;
+    ui.newRecord.classList.toggle('hidden', !isRecord);
+    updateBoosters();
+    setTimeout(() => { if (state.mode === 'over') showOverlay(ui.gameover); }, 700);
+  }
+
+  /* =========================================================
+     БУСТЕРЫ
+     ========================================================= */
+  function useShake() {
+    if (state.mode !== 'playing' || state.shakes <= 0 || state.shakeTime > 0) return;
+    state.shakes--;
+    state.bombMode = false;
+    state.shakeTime = 750;
+    state.shakeKick = 0;
+    state.safeTime = 1800; // во время встряски Game Over не засчитывается
+    // Подбрасываем все фрукты вверх
+    for (const b of getFruits()) {
+      Body.setVelocity(b, { x: b.velocity.x + rand(-2.5, 2.5), y: -rand(5, 10) * (1.2 - b.level * 0.04) });
+      Body.setAngularVelocity(b, rand(-0.15, 0.15));
+    }
+    Sound.shake();
+    vibrate([40, 60, 40, 60, 40]);
+    updateBoosters();
+  }
+
+  function toggleBomb() {
+    if (state.mode !== 'playing') return;
+    if (state.bombMode) { state.bombMode = false; }
+    else if (state.bombs > 0) { state.bombMode = true; }
+    Sound.click();
+    updateBoosters();
+  }
+
+  // Тап по фрукту в режиме бомбы
+  function tryBomb(p) {
+    let target = null, bestD = Infinity;
+    for (const b of getFruits()) {
+      const d = Math.hypot(b.position.x - p.x, b.position.y - p.y) - FRUITS[b.level].r;
+      if (d < 14 && d < bestD) { bestD = d; target = b; }
+    }
+    if (!target) return;
+    const { x, y } = target.position;
+    const lv = target.level;
+    Composite.remove(engine.world, target);
+    // Взрывная волна слегка расталкивает соседей
+    for (const b of getFruits()) {
+      const dx = b.position.x - x, dy = b.position.y - y;
+      const dist = Math.hypot(dx, dy) || 1;
+      if (dist < 160) {
+        const k = (1 - dist / 160) * 6;
+        Body.setVelocity(b, { x: b.velocity.x + (dx / dist) * k, y: b.velocity.y + (dy / dist) * k - 1 });
+      }
+    }
+    fx.flash(x, y, FRUITS[lv].r * 1.4, '#ffdd66');
+    fx.burst(x, y, lv, 30 + lv * 3, 2.6);
+    fx.smoke(x, y, FRUITS[lv].r);
+    fx.cameraShake(10, 350);
+    Sound.bomb();
+    vibrate(90);
+    state.bombs--;
+    state.bombMode = false;
+    state.safeTime = Math.max(state.safeTime, 600);
+    updateBoosters();
+  }
+
+  /* =========================================================
+     ЭФФЕКТЫ: частицы, вспышки, всплывающие очки, тряска камеры
+     ========================================================= */
+  const fx = {
+    particles: [], flashes: [], popups: [],
+    cam: { mag: 0, time: 0, dur: 1 },
+
+    clear() { this.particles.length = this.flashes.length = this.popups.length = 0; this.cam.time = 0; },
+
+    burst(x, y, lv, count, power) {
+      const f = FRUITS[lv];
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * PI2;
+        const sp = rand(60, 160) * power;
+        this.particles.push({
+          x, y,
+          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60,
+          life: 0, max: rand(0.45, 0.9),
+          size: rand(2, 4.5) * (1 + lv * 0.06),
+          color: pick([f.c1, f.c2, f.c2, '#ffffff']),
+          star: Math.random() < 0.35,
+          rot: Math.random() * PI2,
+        });
+      }
+    },
+    smoke(x, y, r) {
+      for (let i = 0; i < 10; i++) {
+        this.particles.push({
+          x: x + rand(-r, r) * 0.5, y: y + rand(-r, r) * 0.5,
+          vx: rand(-30, 30), vy: rand(-70, -20),
+          life: 0, max: rand(0.6, 1), size: rand(r * 0.25, r * 0.45),
+          color: 'rgba(120,100,90,.35)', smoke: true, rot: 0,
+        });
+      }
+    },
+    flash(x, y, r, color) { this.flashes.push({ x, y, r, color, t: 0, dur: 0.4 }); },
+    popup(x, y, text, color, size) { this.popups.push({ x, y, text, color, size, t: 0, dur: 1.1 }); },
+    cameraShake(mag, ms) { this.cam = { mag, time: ms, dur: ms }; },
+
+    update(dt) {
+      for (const p of this.particles) {
+        p.life += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.smoke) { p.vx *= 0.96; p.size *= 1.01; }
+        else { p.vy += 420 * dt; p.vx *= 0.99; }
+        p.rot += dt * 4;
+      }
+      this.particles = this.particles.filter((p) => p.life < p.max);
+      for (const f of this.flashes) f.t += dt;
+      this.flashes = this.flashes.filter((f) => f.t < f.dur);
+      for (const p of this.popups) { p.t += dt; p.y -= 38 * dt; }
+      this.popups = this.popups.filter((p) => p.t < p.dur);
+      if (this.cam.time > 0) this.cam.time -= dt * 1000;
+    },
+
+    offset() {
+      if (this.cam.time <= 0) return { x: 0, y: 0 };
+      const k = (this.cam.time / this.cam.dur) * this.cam.mag;
+      return { x: rand(-k, k) * 0.5, y: rand(-k, k) * 0.5 };
+    },
+
+    draw(ctx) {
+      // Вспышки слияния
+      for (const f of this.flashes) {
+        const k = f.t / f.dur;
+        const rr = f.r * (1 + k * 0.9);
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        g.addColorStop(0, `rgba(255,255,255,${0.95 * (1 - k)})`);
+        g.addColorStop(0.6, `rgba(255,255,255,${0.4 * (1 - k)})`);
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, PI2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r * (1 + k * 1.5), 0, PI2);
+        ctx.lineWidth = 5 * (1 - k);
+        ctx.strokeStyle = f.color;
+        ctx.globalAlpha = 1 - k;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Частицы
+      for (const p of this.particles) {
+        const k = p.life / p.max;
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = p.color;
+        if (p.star) {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          starPath(ctx, 0, 0, 4, p.size * 1.6, p.size * 0.5);
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (p.smoke ? 1 : 1 - k * 0.5), 0, PI2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      // Всплывающие очки
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const p of this.popups) {
+        const k = p.t / p.dur;
+        const s = k < 0.15 ? easeOutBack(k / 0.15) : 1;
+        ctx.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(s, s);
+        ctx.font = `700 ${p.size}px Fredoka, sans-serif`;
+        ctx.lineWidth = p.size * 0.28;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = p.color === '#ffffff' ? '#e2553a' : '#ffffff';
+        ctx.strokeText(p.text, 0, 0);
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, 0, 0);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    },
+  };
+
+  /* =========================================================
+     ИГРОВОЙ ЦИКЛ
+     ========================================================= */
+  function step(ms) {
+    state.time += ms;
+
+    // Встряска: несколько горизонтальных толчков в разные стороны
+    if (state.shakeTime > 0) {
+      state.shakeTime -= ms;
+      state.shakeKick -= ms;
+      if (state.shakeKick <= 0) {
+        state.shakeKick = 150;
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        for (const b of getFruits()) {
+          Body.setVelocity(b, { x: b.velocity.x + dir * rand(3, 6), y: b.velocity.y - rand(0, 2.5) });
+        }
+      }
+    }
+    if (state.safeTime > 0) state.safeTime -= ms;
+
+    Engine.update(engine, ms);
+    processMerges();
+
+    const fruits = getFruits();
+    for (const b of fruits) if (b.pop < 1) b.pop = Math.min(1, b.pop + ms / 260);
+
+    // Таймер появления следующего фрукта
+    if (!state.current) {
+      state.dropTimer -= ms;
+      if (state.dropTimer <= 0) spawnCurrent();
+    } else if (state.current.appear < 1) {
+      state.current.appear = Math.min(1, state.current.appear + ms / 220);
+    }
+
+    // Проверка Game Over: фрукт выше края стакана дольше DANGER_LIMIT
+    let danger = false;
+    if (state.safeTime <= 0) {
+      for (const b of fruits) {
+        if (state.time - b.born < SPAWN_GRACE) continue;
+        if (b.position.y - FRUITS[b.level].r < GLASS.top) { danger = true; break; }
+      }
+    }
+    state.dangerTime = danger ? state.dangerTime + ms : Math.max(0, state.dangerTime - ms * 2);
+    if (state.dangerTime >= DANGER_LIMIT) gameOver();
+  }
+
+  let lastFrame = performance.now();
+  let acc = 0;
+  function frame(now) {
+    const dt = Math.min(now - lastFrame, 100);
+    lastFrame = now;
+    if (state.mode === 'playing') {
+      acc += dt;
+      let n = 0;
+      while (acc >= STEP && n < 5) { step(STEP); acc -= STEP; n++; }
+      if (n === 5) acc = 0;
+    }
+    if (state.mode !== 'paused' && state.mode !== 'menu') fx.update(dt / 1000);
+    render(now);
+    requestAnimationFrame(frame);
+  }
+
+  /* =========================================================
+     РЕНДЕР
+     ========================================================= */
+  // Контур стакана — U-образная фигура с толстыми стенками и дном
+  function glassPath(c) {
+    const { left: L, right: R, top: T, bottom: B, wall: w, base } = GLASS;
+    const ro = 26, ri = 9;
+    c.beginPath();
+    c.moveTo(L - w, T);
+    c.lineTo(L - w, B + base - ro);
+    c.arcTo(L - w, B + base, L - w + ro, B + base, ro);
+    c.lineTo(R + w - ro, B + base);
+    c.arcTo(R + w, B + base, R + w, B + base - ro, ro);
+    c.lineTo(R + w, T);
+    c.lineTo(R, T);
+    c.lineTo(R, B - ri);
+    c.arcTo(R, B, R - ri, B, ri);
+    c.lineTo(L + ri, B);
+    c.arcTo(L, B, L, B - ri, ri);
+    c.lineTo(L, T);
+    c.closePath();
+  }
+
+  // Задняя часть стакана (рисуется ДО фруктов)
+  function drawGlassBack(c) {
+    const { left: L, right: R, top: T, bottom: B, wall: w, base } = GLASS;
+    const cx = (L + R) / 2;
+
+    // Тень от стакана на «столе»
+    c.save();
+    c.translate(cx, B + base + 4);
+    c.scale(1, 0.08);
+    const sg = c.createRadialGradient(0, 0, 0, 0, 0, 230);
+    sg.addColorStop(0, 'rgba(170,80,50,.35)');
+    sg.addColorStop(1, 'rgba(170,80,50,0)');
+    c.fillStyle = sg;
+    c.beginPath(); c.arc(0, 0, 230, 0, PI2); c.fill();
+    c.restore();
+
+    // Задняя стенка: светлее по краям — эффект цилиндра
+    const g = c.createLinearGradient(L, 0, R, 0);
+    g.addColorStop(0, 'rgba(255,255,255,.5)');
+    g.addColorStop(0.15, 'rgba(255,255,255,.2)');
+    g.addColorStop(0.5, 'rgba(255,255,255,.12)');
+    g.addColorStop(0.85, 'rgba(255,255,255,.2)');
+    g.addColorStop(1, 'rgba(255,255,255,.45)');
+    roundRect(c, L, T, R - L, B - T, 9);
+    c.fillStyle = g;
+    c.fill();
+
+    // Задняя половина горлышка
+    c.beginPath();
+    c.ellipse(cx, T, (R - L) / 2 + w / 2, 13, 0, Math.PI, PI2);
+    c.lineWidth = 3;
+    c.strokeStyle = 'rgba(255,255,255,.6)';
+    c.stroke();
+  }
+
+  // Передняя часть стакана (рисуется ПОСЛЕ фруктов): грани, блики, ободок
+  function drawGlassFront(c, now) {
+    const { left: L, right: R, top: T, bottom: B, wall: w, base } = GLASS;
+    const cx = (L + R) / 2;
+    const ow = R - L + w * 2;
+
+    // Толстые полупрозрачные грани
+    glassPath(c);
+    const g = c.createLinearGradient(L - w, 0, R + w, 0);
+    g.addColorStop(0, 'rgba(255,255,255,.92)');
+    g.addColorStop(w * 0.45 / ow, 'rgba(225,242,255,.55)');
+    g.addColorStop(w / ow, 'rgba(205,232,255,.4)');
+    g.addColorStop(0.5, 'rgba(225,242,255,.45)');
+    g.addColorStop(1 - w / ow, 'rgba(205,232,255,.4)');
+    g.addColorStop(1 - w * 0.45 / ow, 'rgba(225,242,255,.5)');
+    g.addColorStop(1, 'rgba(255,255,255,.85)');
+    c.fillStyle = g;
+    c.fill();
+    // Дно чуть плотнее
+    const bg = c.createLinearGradient(0, B, 0, B + base);
+    bg.addColorStop(0, 'rgba(255,255,255,.55)');
+    bg.addColorStop(1, 'rgba(255,255,255,.15)');
+    c.save();
+    glassPath(c);
+    c.clip();
+    c.fillStyle = bg;
+    c.fillRect(L - w, B, ow, base);
+    c.restore();
+    // Контуры граней
+    glassPath(c);
+    c.lineWidth = 2;
+    c.lineJoin = 'round';
+    c.strokeStyle = 'rgba(170,105,85,.4)';
+    c.stroke();
+    c.beginPath();
+    c.moveTo(L + 1.5, T); c.lineTo(L + 1.5, B - 9);
+    c.moveTo(R - 1.5, T); c.lineTo(R - 1.5, B - 9);
+    c.moveTo(L + 9, B - 1.5); c.lineTo(R - 9, B - 1.5);
+    c.lineWidth = 2;
+    c.strokeStyle = 'rgba(255,255,255,.85)';
+    c.stroke();
+
+    // Вертикальные блики стекла
+    const hl = c.createLinearGradient(0, T, 0, B);
+    hl.addColorStop(0, 'rgba(255,255,255,.55)');
+    hl.addColorStop(0.7, 'rgba(255,255,255,.15)');
+    hl.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = hl;
+    roundRect(c, L + 9, T + 26, 10, B - T - 70, 5); c.fill();
+    roundRect(c, L + 25, T + 44, 4, (B - T) * 0.45, 2); c.fill();
+    roundRect(c, R - 17, T + 34, 6, B - T - 110, 3); c.fill();
+    // Блик на внешней грани
+    c.fillStyle = 'rgba(255,255,255,.9)';
+    roundRect(c, L - w + 3, T + 14, 3.5, B - T - 30, 2); c.fill();
+
+    // Передняя половина горлышка и колпачки стенок
+    c.beginPath();
+    c.ellipse(cx, T, (R - L) / 2 + w / 2, 13, 0, 0, Math.PI);
+    c.lineWidth = 3;
+    c.strokeStyle = 'rgba(255,255,255,.75)';
+    c.stroke();
+    c.fillStyle = '#ffffff';
+    roundRect(c, L - w - 1, T - 4, w + 2, 8, 4); c.fill();
+    roundRect(c, R - 1, T - 4, w + 2, 8, 4); c.fill();
+
+    // Красная линия опасности
+    if (state.dangerTime > 0 && state.mode !== 'menu') {
+      const k = Math.min(1, state.dangerTime / DANGER_LIMIT);
+      const blink = 0.5 + 0.5 * Math.sin(now / (90 - k * 50));
+      c.save();
+      c.setLineDash([10, 8]);
+      c.lineDashOffset = -now / 30;
+      c.lineWidth = 4;
+      c.strokeStyle = `rgba(255,60,60,${0.4 + 0.6 * blink})`;
+      c.beginPath(); c.moveTo(L - w, T); c.lineTo(R + w, T); c.stroke();
+      c.restore();
+      // Шкала оставшегося времени
+      c.fillStyle = 'rgba(255,60,60,.25)';
+      roundRect(c, cx - 60, T - 26, 120, 8, 4); c.fill();
+      c.fillStyle = '#ff4a4a';
+      roundRect(c, cx - 60, T - 26, 120 * k, 8, 4); c.fill();
+    }
+  }
+
+  // Пунктирная направляющая от висящего фрукта до точки падения
+  function drawGuide(c, fruits, x, lv, now) {
+    const r = FRUITS[lv].r;
+    let end = GLASS.bottom - r; // центр фрукта в точке приземления
+    for (const b of fruits) {
+      const R = r + FRUITS[b.level].r;
+      const dx = Math.abs(b.position.x - x);
+      if (dx < R) {
+        const cy = b.position.y - Math.sqrt(R * R - dx * dx);
+        if (cy < end) end = cy;
+      }
+    }
+    const startY = DROP_Y + r + 8;
+    const endY = Math.max(startY, end + r * 0.6);
+    const gap = 13;
+    const off = (now / 25) % gap;
+    c.fillStyle = FRUITS[lv].c2;
+    for (let y = startY + off; y < endY; y += gap) {
+      const fade = Math.min(1, (endY - y) / 40);
+      c.globalAlpha = 0.85 * fade;
+      c.beginPath();
+      c.arc(x, y, 2.8, 0, PI2);
+      c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+
+  function drawSprite(c, lv, x, y, angle, scale) {
+    const s = getSprite(lv);
+    c.save();
+    c.translate(x, y);
+    if (angle) c.rotate(angle);
+    if (scale !== 1) c.scale(scale, scale);
+    c.drawImage(s.canvas, -s.size / 2, -s.size / 2, s.size, s.size);
+    c.restore();
+  }
+
+  function render(now) {
+    const { dpr, scale, ox, oy } = view;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Тряска: камера + покачивание при встряске стакана
+    const cam = fx.offset();
+    let sx = cam.x, sy = cam.y, rot = 0;
+    if (state.shakeTime > 0) {
+      const k = state.shakeTime / 750;
+      sx += Math.sin(now / 28) * 9 * k;
+      rot = Math.sin(now / 40) * 0.025 * k;
+    }
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
+    ctx.translate(sx, sy);
+    if (rot) {
+      ctx.translate(WORLD_W / 2, GLASS.bottom);
+      ctx.rotate(rot);
+      ctx.translate(-WORLD_W / 2, -GLASS.bottom);
+    }
+
+    const fruits = getFruits();
+    drawGlassBack(ctx);
+
+    // Направляющая и висящий фрукт
+    const cur = state.current;
+    const showDropper = cur && (state.mode === 'playing' || state.mode === 'paused');
+    const aimX = cur ? clampAim(state.aimX, cur.level) : 0;
+    if (showDropper && !state.bombMode) drawGuide(ctx, fruits, aimX, cur.level, now);
+
+    // Фрукты в стакане
+    for (const b of fruits) {
+      const s = b.pop < 1 ? 0.5 + 0.5 * easeOutBack(b.pop) : 1;
+      drawSprite(ctx, b.level, b.position.x, b.position.y, b.angle, s);
+    }
+
+    // Режим бомбы: пульсирующие прицелы на фруктах
+    if (state.bombMode) {
+      const p = 0.5 + 0.5 * Math.sin(now / 120);
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = `rgba(255,70,50,${0.5 + 0.5 * p})`;
+      for (const b of fruits) {
+        ctx.beginPath();
+        ctx.arc(b.position.x, b.position.y, FRUITS[b.level].r + 3 + p * 3, 0, PI2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    drawGlassFront(ctx, now);
+
+    if (showDropper) {
+      const a = cur.appear;
+      const bob = Math.sin(now / 300) * 2;
+      ctx.globalAlpha = state.bombMode ? 0.35 : 1;
+      drawSprite(ctx, cur.level, aimX, DROP_Y + bob, Math.sin(now / 500) * 0.06, 0.4 + 0.6 * easeOutBack(a));
+      ctx.globalAlpha = 1;
+    }
+
+    fx.draw(ctx);
+
+    // Подсказка в режиме бомбы
+    if (state.bombMode) {
+      ctx.save();
+      ctx.font = '700 19px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const text = '💣 Коснись фрукта, чтобы взорвать';
+      const w = Math.min(ctx.measureText(text).width + 32, WORLD_W - 16);
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      roundRect(ctx, WORLD_W / 2 - w / 2, 34, w, 38, 19);
+      ctx.fill();
+      ctx.fillStyle = '#e2553a';
+      ctx.fillText(text, WORLD_W / 2, 54, WORLD_W - 40);
+      ctx.restore();
+    }
+  }
+
+  /* =========================================================
+     ИНТЕРФЕЙС
+     ========================================================= */
+  function updateScore(bump) {
+    ui.score.textContent = state.score;
+    ui.best.textContent = state.best;
+    ui.menuBest.textContent = state.best;
+    if (bump) {
+      ui.score.classList.remove('bump');
+      void ui.score.offsetWidth; // перезапуск CSS-анимации
+      ui.score.classList.add('bump');
+    }
+  }
+
+  function updateBoosters() {
+    const playing = state.mode === 'playing';
+    ui.shakeCount.textContent = state.shakes;
+    ui.bombCount.textContent = state.bombs;
+    ui.btnShake.disabled = !playing || state.shakes <= 0;
+    ui.btnBomb.disabled = !playing || (state.bombs <= 0 && !state.bombMode);
+    ui.btnBomb.classList.toggle('active', state.bombMode);
+    canvas.style.cursor = state.bombMode ? 'crosshair' : 'pointer';
+  }
+
+  // Рисует фрукт в небольшой DOM-канвас (превью, эволюция, меню)
+  function paintFruitCanvas(cv, items) {
+    const rect = cv.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(1, Math.round(rect.width * dpr));
+    const h = Math.max(1, Math.round(rect.height * dpr));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const c = cv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, w, h);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const it of items(rect.width, rect.height)) {
+      c.save();
+      c.translate(it.x, it.y);
+      if (it.rot) c.rotate(it.rot);
+      drawFruit(c, it.lv, it.r);
+      c.restore();
+    }
+  }
+
+  function drawNext() {
+    const lv = state.next;
+    paintFruitCanvas(ui.next, (w, h) => {
+      const r = Math.min(w, h) * (0.24 + lv * 0.035);
+      return [{ lv, x: w / 2, y: h / 2 + r * 0.12, r }];
+    });
+  }
+
+  function buildEvolution() {
+    ui.evo.innerHTML = '';
+    FRUITS.forEach((f) => {
+      const item = document.createElement('div');
+      item.className = 'evo-item';
+      item.title = f.name;
+      item.appendChild(document.createElement('canvas'));
+      ui.evo.appendChild(item);
+    });
+  }
+
+  function drawEvolution() {
+    [...ui.evo.children].forEach((item, lv) => {
+      paintFruitCanvas(item.firstChild, (w) => {
+        const r = (w / 2) * (0.42 + 0.3 * (lv / LAST_LEVEL));
+        return [{ lv, x: w / 2, y: w / 2 + r * 0.18, r }];
+      });
+    });
+    updateEvolution();
+  }
+
+  function updateEvolution() {
+    [...ui.evo.children].forEach((item, lv) => {
+      item.classList.toggle('locked', lv > state.maxLevel);
+      item.classList.toggle('current', lv === state.maxLevel);
+    });
+  }
+
+  function drawHeroes() {
+    paintFruitCanvas($('#heroCanvas'), (w, h) => {
+      const u = Math.min(w / 280, h / 120);
+      return [
+        { lv: 2, x: w / 2 - 108 * u, y: h - 30 * u, r: 22 * u, rot: -0.2 },
+        { lv: 5, x: w / 2 - 62 * u, y: h - 40 * u, r: 32 * u, rot: 0.1 },
+        { lv: 0, x: w / 2 + 116 * u, y: h - 22 * u, r: 14 * u, rot: 0.3 },
+        { lv: 9, x: w / 2 + 70 * u, y: h - 42 * u, r: 32 * u, rot: 0.12 },
+        { lv: 10, x: w / 2, y: h - 50 * u, r: 46 * u },
+      ];
+    });
+  }
+
+  function drawOverHero() {
+    paintFruitCanvas($('#overCanvas'), (w, h) => {
+      const u = Math.min(w / 280, h / 120);
+      const lv = Math.min(state.maxLevel, LAST_LEVEL);
+      return [
+        { lv: Math.max(0, lv - 2), x: w / 2 - 80 * u, y: h - 34 * u, r: 26 * u, rot: -0.25 },
+        { lv: Math.max(0, lv - 1), x: w / 2 + 80 * u, y: h - 34 * u, r: 26 * u, rot: 0.25 },
+        { lv, x: w / 2, y: h - 52 * u, r: 44 * u },
+      ];
+    });
+  }
+
+  function showOverlay(el) {
+    el.classList.add('show');
+    if (el === ui.menu) drawHeroes();
+    if (el === ui.gameover) drawOverHero();
+  }
+  function hideOverlays() {
+    ui.menu.classList.remove('show');
+    ui.gameover.classList.remove('show');
+  }
+
+  function openMenu() {
+    if (state.mode === 'playing') state.mode = 'paused';
+    state.aiming = false;
+    const paused = state.mode === 'paused';
+    ui.btnPlay.textContent = paused ? 'Продолжить' : 'Играть';
+    ui.btnNew.classList.toggle('hidden', !paused);
+    ui.gameover.classList.remove('show');
+    updateScore(false);
+    updateBoosters();
+    showOverlay(ui.menu);
+  }
+
+  function updateSoundBtn() {
+    ui.btnSound.textContent = Sound.enabled ? '🔊 Звук: вкл' : '🔇 Звук: выкл';
+  }
+
+  function startNewGame() {
+    state.startBest = state.best;
+    resetGame();
+  }
+
+  /* =========================================================
+     РАЗМЕРЫ И АДАПТИВ
+     ========================================================= */
+  function resize() {
+    const rect = stage.getBoundingClientRect();
+    view.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    view.cw = rect.width;
+    view.ch = rect.height;
+    canvas.width = Math.max(1, Math.round(rect.width * view.dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * view.dpr));
+    view.scale = Math.min(view.cw / WORLD_W, view.ch / WORLD_H);
+    view.ox = (view.cw - WORLD_W * view.scale) / 2;
+    view.oy = (view.ch - WORLD_H * view.scale) / 2;
+    drawNext();
+    drawEvolution();
+    if (ui.menu.classList.contains('show')) drawHeroes();
+    if (ui.gameover.classList.contains('show')) drawOverHero();
+  }
+
+  /* =========================================================
+     ВВОД: палец или мышь
+     ========================================================= */
+  function toWorld(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - view.ox) / view.scale,
+      y: (e.clientY - rect.top - view.oy) / view.scale,
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    Sound.init();
+    if (state.mode !== 'playing') return;
+    const p = toWorld(e);
+    if (state.bombMode) { tryBomb(p); return; }
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    state.aiming = true;
+    state.aimX = p.x;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (state.mode !== 'playing') return;
+    // Мышь двигает фрукт и без нажатия; палец — только когда прижат
+    if (state.aiming || e.pointerType === 'mouse') state.aimX = toWorld(e).x;
+  });
+  const release = (e) => {
+    if (!state.aiming) return;
+    state.aiming = false;
+    if (e.type === 'pointerup') {
+      state.aimX = toWorld(e).x;
+      dropFruit();
+    }
+  };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Клавиатура для десктопа: ←/→ двигают, пробел бросает
+  window.addEventListener('keydown', (e) => {
+    if (state.mode !== 'playing') return;
+    if (e.code === 'ArrowLeft') state.aimX -= 12;
+    else if (e.code === 'ArrowRight') state.aimX += 12;
+    else if (e.code === 'Space') { e.preventDefault(); Sound.init(); dropFruit(); }
+    if (state.current) state.aimX = clampAim(state.aimX, state.current.level);
+  });
+
+  // Кнопки
+  const tap = (el, fn) => el.addEventListener('click', () => { Sound.init(); fn(); });
+  tap($('#btnBack'), () => { Sound.click(); openMenu(); });
+  tap($('#btnRestart'), () => { Sound.click(); startNewGame(); });
+  tap(ui.btnShake, useShake);
+  tap(ui.btnBomb, toggleBomb);
+  tap(ui.btnPlay, () => {
+    Sound.click();
+    if (state.mode === 'paused') { state.mode = 'playing'; hideOverlays(); updateBoosters(); lastFrame = performance.now(); }
+    else startNewGame();
+  });
+  tap(ui.btnNew, () => { Sound.click(); startNewGame(); });
+  tap(ui.btnSound, () => {
+    Sound.enabled = !Sound.enabled;
+    storage.set('fruitMerge.sound', Sound.enabled);
+    updateSoundBtn();
+    Sound.click();
+  });
+  tap($('#btnAgain'), () => { Sound.click(); startNewGame(); });
+
+  // Блокируем зум/прокрутку жестами на iOS
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
+  // Пауза при сворачивании вкладки
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state.mode === 'playing') openMenu();
+  });
+
+  /* =========================================================
+     СТАРТ
+     ========================================================= */
+  buildEvolution();
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage);
+  window.addEventListener('resize', resize);
+  resize();
+  updateSoundBtn();
+  updateScore(false);
+  updateBoosters();
+  state.next = 0;
+  drawNext();
+  drawHeroes();
+  // Перерисовать канвасы, когда загрузится шрифт (влияет на раскладку)
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+  requestAnimationFrame(frame);
+
+  // Хук для отладки из консоли
+  window.FruitMerge = { state, engine, createFruit, FRUITS, GLASS };
+})();
+</script>
+</body>
+</html>
