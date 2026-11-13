@@ -17,3 +17,26 @@
 - Фрукты выше края стакана дольше 2 секунд — Game Over.
 - Бустеры: «Встряска» (трясёт стакан) и «Бомба» (тап по фрукту уничтожает его). +1 к каждому за каждые 1500 очков.
 - Рекорд хранится в `localStorage`.
+
+## Деплой (Gunicorn + Nginx)
+Схема: браузер → Nginx (порт 80) → Gunicorn (127.0.0.1:8000) → `deploy/app.py` отдаёт `index.html`.
+
+```bash
+# на сервере (Ubuntu), репозиторий склонирован в /opt/mini-game
+apt-get install -y nginx && pip install gunicorn
+cd /opt/mini-game
+
+# Gunicorn как сервис
+cp deploy/fruit-merge.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now fruit-merge
+
+# Nginx: в deploy/nginx.conf замените server_name _ на свой домен
+cp deploy/nginx.conf /etc/nginx/sites-available/fruit-merge
+ln -sf /etc/nginx/sites-available/fruit-merge /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+
+curl http://<домен-или-IP>/healthz   # -> ok
+```
+Для HTTPS: `apt install certbot python3-certbot-nginx && certbot --nginx -d <домен>`.
+Вибрация и звук на телефоне работают надёжнее по HTTPS.
