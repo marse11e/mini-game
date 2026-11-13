@@ -1,4 +1,4 @@
-# systemd-юнит для Gunicorn на сервере.
+# systemd-юнит для Gunicorn.
 # Путь /opt/mini-game поменяйте на свой. Установка:
 #   cp deploy/fruit-merge.service /etc/systemd/system/
 #   systemctl daemon-reload && systemctl enable --now fruit-merge
@@ -8,6 +8,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/mini-game
+Environment=FRUIT_MERGE_DB=/opt/mini-game/deploy/data/scores.json
 ExecStart=/usr/local/bin/gunicorn -c deploy/gunicorn.conf.py
 Restart=always
 User=www-data
