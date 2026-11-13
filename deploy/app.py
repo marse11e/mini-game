@@ -16,7 +16,8 @@ players.json — кто играет, по устройствам:
         "deviceId": "...", "names": ["Марсель"], "lastName": "Марсель",
         "device": {"os": "iOS", "browser": "Safari", "screen": "390x844", ...},
         "settings": {"music": 0.5, "sfx": 0.8, "vibration": true},
-        "difficulty": "easy", "gamesPlayed": 12, "best": {"easy": 1840, ...},
+        "difficulty": "easy", "gamesPlayed": 12, "xp": 640, "streak": 3,
+        "best": {"easy": 1840, ...},
         "firstSeen": "...", "lastSeen": "...", "visits": 7
       }
     }
@@ -192,9 +193,11 @@ class PlayersDB(JsonStore):
                 entry["settings"] = {**entry.get("settings", {}), **settings}
             if payload.get("difficulty") in DIFFICULTIES:
                 entry["difficulty"] = payload["difficulty"]
-            games = payload.get("gamesPlayed")
-            if isinstance(games, int) and not isinstance(games, bool) and games >= 0:
-                entry["gamesPlayed"] = games
+            # Счётчики прогресса: число партий, опыт, серия дней
+            for key in ("gamesPlayed", "xp", "streak"):
+                value = payload.get(key)
+                if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10**9:
+                    entry[key] = value
             best = self.clean_best(payload.get("best"))
             if best:
                 entry["best"] = {**entry.get("best", {}), **best}

@@ -46,15 +46,16 @@
     -webkit-touch-callout: none;
   }
   body {
-    background-color: #ffd9c0;
-    /* Тёплый персиковый фон: мягкие пятна света + точечный узор */
+    /* Цвет фона задаёт самый крупный фрукт партии (см. setTheme) и меняется плавно.
+       Слои поверх — полупрозрачные блики и точки, они подходят к любому цвету. */
+    background-color: var(--bg, #ffd9c0);
+    transition: background-color 1.4s ease;
     background-image:
-      radial-gradient(circle at 15% 12%, rgba(255,255,255,.55) 0, rgba(255,255,255,0) 32%),
-      radial-gradient(circle at 88% 38%, rgba(255,240,220,.6) 0, rgba(255,240,220,0) 30%),
-      radial-gradient(circle at 20% 85%, rgba(255,180,150,.45) 0, rgba(255,180,150,0) 35%),
+      radial-gradient(circle at 15% 12%, rgba(255,255,255,.5) 0, rgba(255,255,255,0) 32%),
+      radial-gradient(circle at 88% 38%, rgba(255,255,255,.4) 0, rgba(255,255,255,0) 30%),
       radial-gradient(rgba(255,255,255,.35) 1.6px, transparent 1.8px),
-      linear-gradient(180deg, #ffe9d8 0%, #ffd6bb 55%, #ffc6a5 100%);
-    background-size: auto, auto, auto, 22px 22px, auto;
+      linear-gradient(180deg, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 55%, rgba(120,40,0,.08) 100%);
+    background-size: auto, auto, 22px 22px, auto;
   }
   button { font-family: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 
@@ -234,7 +235,7 @@
     letter-spacing: .01em;
   }
   .logo span { color: #4cc36b; text-shadow: 0 3px 0 #fff, 0 6px 0 #2f9a4c, 0 10px 14px rgba(40,120,60,.25); }
-  .card canvas.hero { width: 100%; max-width: 280px; height: 100px; display: block; margin: 6px auto 4px; }
+  .card canvas.hero { width: 100%; max-width: 280px; height: 88px; display: block; margin: 6px auto 2px; }
   .card h2 { font-size: 30px; font-weight: 700; color: var(--accent-dark); }
   .card .sub { font-size: 15px; color: var(--ink-soft); margin-top: 4px; }
   .card .big-score { font-size: 56px; font-weight: 700; color: var(--ink); line-height: 1.1; margin-top: 8px; }
@@ -334,9 +335,45 @@
   .board .sc { font-weight: 700; }
   .board-src { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
 
+  /* --- Иконки (SVG-символы, объявлены в начале body) --- */
+  .ico { width: 1.2em; height: 1.2em; vertical-align: -0.24em; flex: none; }
+  .btn .ico { margin-right: 4px; }
+  .medal.m1 { color: #ffc531; }
+  .medal.m2 { color: #c3ccd8; }
+  .medal.m3 { color: #e29a62; }
+
+  /* --- Задание текущей партии --- */
+  .mission {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 8px;
+    margin: 8px 12px 0; padding: 0 12px;
+    height: 30px; border-radius: 15px;
+    background: rgba(255,255,255,.62);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.75);
+    font-size: 14px; font-weight: 600;
+  }
+  .mission::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: var(--p, 0%);
+    background: rgba(76,195,107,.3);
+    transition: width .35s ease;
+  }
+  .mission > * { position: relative; }
+  .mission .m-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mission .m-count { color: var(--ink-soft); font-weight: 700; }
+  .mission.done { animation: bump .45s ease; }
+  .mission.done::before { background: rgba(76,195,107,.55); }
+
+  /* --- Уровень игрока и серия дней --- */
+  .profile { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 14px; color: var(--ink-soft); }
+  .profile b { color: var(--ink); }
+  .xpbar { height: 8px; margin: 6px 18px 0; border-radius: 4px; background: #ffe3d3; overflow: hidden; }
+  .xpbar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #ffc531, #ff9a3c); transition: width .8s ease; }
+
   /* --- Настройки --- */
   .setting { display: flex; align-items: center; gap: 10px; margin-top: 16px; text-align: left; }
-  .setting .s-label { flex: 0 0 106px; font-size: 16px; font-weight: 600; }
+  .setting .s-label { flex: 0 0 112px; font-size: 16px; font-weight: 600; }
+  .setting .s-label .ico { margin-right: 4px; color: var(--accent); }
   .setting .s-val { flex: 0 0 46px; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
   .range {
     -webkit-appearance: none; appearance: none;
@@ -375,7 +412,7 @@
     border-radius: 14px; background: #fff3ea;
     font-size: 13px; line-height: 1.35; color: var(--ink-soft);
   }
-  .tip button { float: right; font-size: 16px; line-height: 1; padding: 0 0 4px 8px; color: var(--ink-soft); }
+  .tip button { float: right; font-size: 14px; line-height: 1; padding: 0 0 4px 8px; color: var(--ink-soft); }
   .privacy { font-size: 11px; color: var(--ink-soft); opacity: .8; margin-top: 14px; line-height: 1.35; }
 
   .hidden { display: none !important; }
@@ -384,6 +421,59 @@
 </style>
 </head>
 <body>
+<!-- Набор иконок интерфейса. Используются так: <svg class="ico"><use href="#i-имя"/></svg> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-trophy" viewBox="0 0 24 24">
+      <path d="M7 5H4.2a2.8 2.8 0 0 0 2.9 4M17 5h2.8a2.8 2.8 0 0 1-2.9 4" fill="none" stroke="#e09a0a" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M7 3h10v5.5a5 5 0 0 1-10 0z" fill="#ffc531"/>
+      <path d="M11 13h2v4h-2z" fill="#e09a0a"/><rect x="7.5" y="17" width="9" height="3.5" rx="1.2" fill="#e2553a"/>
+      <path d="M9.3 5.2v3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>
+    </symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24">
+      <path d="M3.5 9.2h3.6L12.5 5v14l-5.4-4.2H3.5z" fill="#ff7a59" stroke="#e2553a" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8" fill="none" stroke="#e2553a" stroke-width="1.9" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-music" viewBox="0 0 24 24">
+      <path d="M9.5 17V5.6l9.5-2v11.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="7" cy="17.3" rx="3" ry="2.5" fill="currentColor"/><ellipse cx="16.5" cy="15.3" rx="3" ry="2.5" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24">
+      <path d="M12 3a6 6 0 0 0-6 6v4.2L4 16.6h16l-2-3.4V9a6 6 0 0 0-6-6z" fill="currentColor"/>
+      <path d="M9.8 19a2.3 2.3 0 0 0 4.4 0z" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-vibrate" viewBox="0 0 24 24">
+      <rect x="8" y="3" width="8" height="18" rx="2.2" fill="currentColor"/>
+      <path d="M4.6 8.5v7M19.4 8.5v7M1.8 10.5v3M22.2 10.5v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-fullscreen" viewBox="0 0 24 24">
+      <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-install" viewBox="0 0 24 24">
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.6" fill="#fff" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M12 8.5v6M9 11.5h6" stroke="#ff7a59" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-medal" viewBox="0 0 24 24">
+      <path d="M7.5 2h3.2l2 5.2-3 1.4zM16.5 2h-3.2l-2 5.2 3 1.4z" fill="#ff7a59"/>
+      <circle cx="12" cy="15" r="6.5" fill="currentColor" stroke="rgba(0,0,0,.18)" stroke-width="1"/>
+      <path d="M12 11.2l1.2 2.4 2.6.4-1.9 1.9.4 2.6-2.3-1.2-2.3 1.2.4-2.6-1.9-1.9 2.6-.4z" fill="#fff" opacity=".85"/>
+    </symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24">
+      <path d="M12.5 2c.8 3.8 5 5.3 5 10.5a5.5 5.5 0 0 1-11 0c0-2.3 1.2-3.6 2.3-4.8.1 2 .9 3 1.9 3.2C10.500 8 10.800 5 12.5 2z" fill="#ff7a2f"/>
+      <path d="M12 13.2c1.100 1 2.200 2 2.200 3.500a2.200 2.200 0 0 1-4.400 0c0-1.500 1.100-2.500 2.200-3.500z" fill="#ffd24a"/>
+    </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" fill="#fff" stroke="#e2553a" stroke-width="2.2"/>
+      <circle cx="12" cy="12" r="5" fill="none" stroke="#e2553a" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="#e2553a"/>
+    </symbol>
+    <symbol id="i-star" viewBox="0 0 24 24">
+      <path d="M12 2.6l2.9 5.9 6.500.9-4.700 4.600 1.100 6.500L12 17.400 6.200 20.500l1.100-6.500L2.600 9.400l6.500-.9z" fill="#ffc531" stroke="#e09a0a" stroke-width="1.2" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
 <div id="game">
   <!-- Верхняя панель: назад / счёт / рекорд / рестарт -->
   <header class="topbar">
@@ -431,6 +521,13 @@
     </div>
   </div>
 
+  <!-- Задание текущей партии -->
+  <div class="mission hidden" id="mission">
+    <svg class="ico" aria-hidden="true"><use href="#i-target"/></svg>
+    <span class="m-text" id="missionText"></span>
+    <span class="m-count" id="missionCount"></span>
+  </div>
+
   <!-- Игровое поле -->
   <main id="stage"><canvas id="canvas"></canvas></main>
 
@@ -461,6 +558,11 @@
       <div class="logo">Fruit<br><span>Merge</span></div>
       <canvas class="hero" id="heroCanvas"></canvas>
       <div class="greeting">Привет, <b id="playerName"></b>! <button class="link-btn" id="btnChangeName">сменить</button></div>
+      <div class="profile">
+        <span><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg> Уровень <b id="plLevel">1</b> · <span id="plRank"></span></span>
+        <span class="hidden" id="plStreak"><svg class="ico" aria-hidden="true"><use href="#i-flame"/></svg> <b id="plStreakDays"></b> подряд</span>
+      </div>
+      <div class="xpbar"><i id="plXp"></i></div>
       <div class="segmented" id="diffPicker">
         <button data-diff="easy">Лёгкий</button>
         <button data-diff="medium">Средний</button>
@@ -471,11 +573,11 @@
       <button class="btn" id="btnPlay">Играть</button>
       <button class="btn secondary hidden" id="btnNew">Новая игра</button>
       <div class="row">
-        <button class="btn secondary wide" id="btnBoard">🏆 Рейтинг</button>
-        <button class="btn secondary" id="btnSettings">⚙️ Звук</button>
+        <button class="btn secondary wide" id="btnBoard"><svg class="ico" aria-hidden="true"><use href="#i-trophy"/></svg>Рейтинг</button>
+        <button class="btn secondary" id="btnSettings"><svg class="ico" aria-hidden="true"><use href="#i-sound"/></svg>Звук</button>
       </div>
-      <div class="tip hidden" id="iosTip"><button id="btnIosTipClose" aria-label="Скрыть">✕</button>
-        📲 Чтобы играть на весь экран без панели браузера: «Поделиться» → «На экран „Домой“».</div>
+      <div class="tip hidden" id="iosTip"><button id="btnIosTipClose" aria-label="Скрыть"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+        <svg class="ico" aria-hidden="true"><use href="#i-install"/></svg> Чтобы играть на весь экран без панели браузера: «Поделиться» → «На экран „Домой“».</div>
     </div>
   </div>
 
@@ -484,21 +586,21 @@
     <div class="card">
       <h2>Настройки</h2>
       <label class="setting">
-        <span class="s-label">🎵 Музыка</span>
+        <span class="s-label"><svg class="ico" aria-hidden="true"><use href="#i-music"/></svg>Музыка</span>
         <input class="range" type="range" id="volMusic" min="0" max="100" step="1">
         <span class="s-val" id="volMusicVal"></span>
       </label>
       <label class="setting">
-        <span class="s-label">🔔 Эффекты</span>
+        <span class="s-label"><svg class="ico" aria-hidden="true"><use href="#i-bell"/></svg>Эффекты</span>
         <input class="range" type="range" id="volSfx" min="0" max="100" step="1">
         <span class="s-val" id="volSfxVal"></span>
       </label>
       <label class="setting">
-        <span class="s-label">📳 Вибрация</span>
+        <span class="s-label"><svg class="ico" aria-hidden="true"><use href="#i-vibrate"/></svg>Вибрация</span>
         <input class="switch" type="checkbox" id="optVibration">
       </label>
-      <button class="btn secondary" id="btnFullscreen">⛶ На весь экран</button>
-      <div class="tip hidden" id="iosTip2">📲 На iPhone панель браузера скрыть нельзя, но можно добавить игру
+      <button class="btn secondary" id="btnFullscreen"><svg class="ico" aria-hidden="true"><use href="#i-fullscreen"/></svg><span id="fsLabel">На весь экран</span></button>
+      <div class="tip hidden" id="iosTip2"><svg class="ico" aria-hidden="true"><use href="#i-install"/></svg> На iPhone панель браузера скрыть нельзя, но можно добавить игру
         на домашний экран: «Поделиться» → «На экран „Домой“». Оттуда она запускается на весь экран.</div>
       <button class="btn" id="btnSettingsClose">Готово</button>
     </div>
@@ -526,9 +628,12 @@
       <canvas class="hero" id="overCanvas"></canvas>
       <div class="sub" id="finalInfo"></div>
       <div class="big-score" id="finalScore">0</div>
-      <div class="record-badge hidden" id="newRecord">★ Новый рекорд! ★</div>
+      <div class="record-badge hidden" id="newRecord"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg> Новый рекорд!</div>
       <div class="sub" id="finalBest">Рекорд: 0</div>
       <div class="sub" id="finalRank"></div>
+      <div class="sub" id="finalHint"></div>
+      <div class="profile"><span><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg> <b id="finalXp"></b></span></div>
+      <div class="xpbar"><i id="finalXpBar"></i></div>
       <button class="btn" id="btnAgain">Ещё раз</button>
       <button class="btn secondary" id="btnOverMenu">Меню</button>
     </div>
@@ -569,45 +674,47 @@
      multiplier   — множитель очков
      glassInset   — на сколько сужается стакан с каждой стороны
      guide        — направляющая: full / short / none
-     gravity      — сила тяжести */
+     gravity      — сила тяжести
+     help         — насколько охотно игра подкидывает нужный фрукт, когда стакан почти полон (0..1) */
   const DIFFICULTIES = {
     easy: {
       name: 'Лёгкий',
       desc: 'Классические правила: 2 секунды над краем, по 3 бустера, направляющая до самого дна.',
       maxSpawn: 4, dangerLimit: 2000, boosters: 3, boosterEvery: 1500,
-      multiplier: 1, glassInset: 0, guide: 'full', gravity: 1.1,
+      multiplier: 1, glassInset: 0, guide: 'full', gravity: 1.1, help: 0.6,
     },
     medium: {
       name: 'Средний',
       desc: 'Полторы секунды над краем, по 2 бустера, короткая направляющая, фрукты падают быстрее. Очки ×1.5',
       maxSpawn: 4, dangerLimit: 1500, boosters: 2, boosterEvery: 2500,
-      multiplier: 1.5, glassInset: 0, guide: 'short', gravity: 1.3,
+      multiplier: 1.5, glassInset: 0, guide: 'short', gravity: 1.3, help: 0.45,
     },
     hard: {
       name: 'Сложный',
       desc: 'Узкий стакан, в бросках попадаются апельсины, 1 секунда над краем, по 1 бустеру, без направляющей. Очки ×2',
       maxSpawn: 5, dangerLimit: 1000, boosters: 1, boosterEvery: 4000,
-      multiplier: 2, glassInset: 22, guide: 'none', gravity: 1.5,
+      multiplier: 2, glassInset: 22, guide: 'none', gravity: 1.5, help: 0.3,
     },
   };
   // Параметры сложности текущей партии
   const diff = () => DIFFICULTIES[state.difficulty];
 
   /* Цепочка из 11 фруктов.
-     r — радиус; c1/c2/c3 — светлый/основной/тёмный тон градиента; line — контур;
+     r — радиус; bg — цвет фона, когда этот фрукт самый крупный в партии;
+     c1/c2/c3 — светлый/основной/тёмный тон градиента; line — контур;
      eyes/mouth — вариант рожицы; blush — цвет румянца. */
   const FRUITS = [
-    { name: 'Черника',  type: 'blueberry',   r: 14, c1: '#a9bcff', c2: '#5a6fe0', c3: '#2d3486', line: '#232766', mouth: 'smile', blush: 'rgba(255,140,190,.65)' },
-    { name: 'Малина',   type: 'raspberry',   r: 18, c1: '#ffa6c3', c2: '#ee4680', c3: '#a3164a', line: '#7d1038', mouth: 'smile', blush: 'rgba(255,200,220,.6)' },
-    { name: 'Клубника', type: 'strawberry',  r: 23, c1: '#ffa197', c2: '#f23e3f', c3: '#a8141f', line: '#821019', mouth: 'open',  blush: 'rgba(255,190,200,.65)' },
-    { name: 'Лайм',     type: 'lime',        r: 28, c1: '#e0fa96', c2: '#86d236', c3: '#428e14', line: '#2f6a0c', mouth: 'smile', blush: 'rgba(255,130,150,.5)' },
-    { name: 'Персик',   type: 'peach',       r: 34, c1: '#ffe6c2', c2: '#ffb37c', c3: '#f2775d', line: '#c4523f', mouth: 'smile', blush: 'rgba(255,100,120,.45)' },
-    { name: 'Апельсин', type: 'orange',      r: 40, c1: '#ffdb85', c2: '#ffa024', c3: '#e0660b', line: '#b04c06', mouth: 'open',  blush: 'rgba(255,100,110,.45)' },
-    { name: 'Яблоко',   type: 'apple',       r: 47, c1: '#ffa292', c2: '#ea3a3f', c3: '#9e1220', line: '#7c0e19', mouth: 'smile', blush: 'rgba(255,190,200,.6)' },
-    { name: 'Гранат',   type: 'pomegranate', r: 54, c1: '#ff98ad', c2: '#c8254f', c3: '#7a0a2a', line: '#5c0820', mouth: 'smile', blush: 'rgba(255,190,210,.55)' },
-    { name: 'Кокос',    type: 'coconut',     r: 61, c1: '#d3a47c', c2: '#8f5e39', c3: '#56351d', line: '#3f2614', mouth: 'open',  blush: 'rgba(255,150,150,.5)' },
-    { name: 'Ананас',   type: 'pineapple',   r: 68, c1: '#fff3a3', c2: '#ffcc33', c3: '#e39c0b', line: '#a86f05', mouth: 'smile', blush: 'rgba(255,120,120,.5)' },
-    { name: 'Арбуз',    type: 'watermelon',  r: 77, c1: '#b2f293', c2: '#48bb3c', c3: '#1f7a22', line: '#145a17', mouth: 'open',  blush: 'rgba(255,130,150,.6)' },
+    { name: 'Черника',  type: 'blueberry',   r: 14, bg: '#cdd5ff', c1: '#a9bcff', c2: '#5a6fe0', c3: '#2d3486', line: '#232766', mouth: 'smile', blush: 'rgba(255,140,190,.65)' },
+    { name: 'Малина',   type: 'raspberry',   r: 18, bg: '#ffc8dc', c1: '#ffa6c3', c2: '#ee4680', c3: '#a3164a', line: '#7d1038', mouth: 'smile', blush: 'rgba(255,200,220,.6)' },
+    { name: 'Клубника', type: 'strawberry',  r: 23, bg: '#ffcbc4', c1: '#ffa197', c2: '#f23e3f', c3: '#a8141f', line: '#821019', mouth: 'open',  blush: 'rgba(255,190,200,.65)' },
+    { name: 'Лайм',     type: 'lime',        r: 28, bg: '#daf3b6', c1: '#e0fa96', c2: '#86d236', c3: '#428e14', line: '#2f6a0c', mouth: 'smile', blush: 'rgba(255,130,150,.5)' },
+    { name: 'Персик',   type: 'peach',       r: 34, bg: '#ffd9c0', c1: '#ffe6c2', c2: '#ffb37c', c3: '#f2775d', line: '#c4523f', mouth: 'smile', blush: 'rgba(255,100,120,.45)' },
+    { name: 'Апельсин', type: 'orange',      r: 40, bg: '#ffd49c', c1: '#ffdb85', c2: '#ffa024', c3: '#e0660b', line: '#b04c06', mouth: 'open',  blush: 'rgba(255,100,110,.45)' },
+    { name: 'Яблоко',   type: 'apple',       r: 47, bg: '#fbbcb0', c1: '#ffa292', c2: '#ea3a3f', c3: '#9e1220', line: '#7c0e19', mouth: 'smile', blush: 'rgba(255,190,200,.6)' },
+    { name: 'Гранат',   type: 'pomegranate', r: 54, bg: '#f3b4c8', c1: '#ff98ad', c2: '#c8254f', c3: '#7a0a2a', line: '#5c0820', mouth: 'smile', blush: 'rgba(255,190,210,.55)' },
+    { name: 'Кокос',    type: 'coconut',     r: 61, bg: '#e8d0b8', c1: '#d3a47c', c2: '#8f5e39', c3: '#56351d', line: '#3f2614', mouth: 'open',  blush: 'rgba(255,150,150,.5)' },
+    { name: 'Ананас',   type: 'pineapple',   r: 68, bg: '#ffeba6', c1: '#fff3a3', c2: '#ffcc33', c3: '#e39c0b', line: '#a86f05', mouth: 'smile', blush: 'rgba(255,120,120,.5)' },
+    { name: 'Арбуз',    type: 'watermelon',  r: 77, bg: '#c2ecb0', c1: '#b2f293', c2: '#48bb3c', c3: '#1f7a22', line: '#145a17', mouth: 'open',  blush: 'rgba(255,130,150,.6)' },
   ];
   const LAST_LEVEL = FRUITS.length - 1;
   // Очки за создание фрукта уровня n: растут с уровнем (треугольные числа × 2)
@@ -679,6 +786,36 @@
     return NAME_RE.test(name) ? name : null;
   }
 
+  // Ключ календарного дня по местному времени: «2026-11-14». shift — сдвиг в днях
+  function dayKey(shift = 0) {
+    const d = new Date(Date.now() + shift * 864e5);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /* Уровень игрока. Опыт (XP) копится за очки и задания во всех партиях.
+     Для уровня L нужно 50·L·(L−1) XP: 2-й — 100, 3-й — 300, 4-й — 600 и т.д. */
+  const RANKS = [
+    [1, 'Новичок'], [3, 'Садовник'], [5, 'Сборщик урожая'], [8, 'Фруктовый мастер'],
+    [12, 'Повелитель слияний'], [16, 'Арбузный король'], [20, 'Легенда сада'],
+  ];
+  const xpForLevel = (L) => 50 * L * (L - 1);
+  function levelInfo(xp) {
+    let level = 1;
+    while (xpForLevel(level + 1) <= xp) level++;
+    const from = xpForLevel(level), to = xpForLevel(level + 1);
+    let rank = RANKS[0][1];
+    for (const [lv, name] of RANKS) if (level >= lv) rank = name;
+    return { level, rank, progress: (xp - from) / (to - from), toNext: to - xp };
+  }
+
+  // «1 день», «3 дня», «5 дней»
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
   const DB = {
     KEY: 'fruitMerge.db',
     data: null,
@@ -692,6 +829,14 @@
         d.sound = storage.get('fruitMerge.sound', true) !== false;
       }
       if (!DIFFICULTIES[d.difficulty]) d.difficulty = 'easy';
+      // Поля прогресса, которых не было в ранних версиях
+      for (const pl of d.players) {
+        pl.xp = pl.xp || 0;
+        pl.streak = pl.streak || 0;
+        pl.lastDay = pl.lastDay || '';
+        pl.missions = pl.missions || 0;
+        pl.maxCombo = pl.maxCombo || 0;
+      }
       this.data = d;
     },
     save() { storage.set(this.KEY, this.data); },
@@ -709,7 +854,8 @@
     login(name) {
       let p = this.player(name);
       if (!p) {
-        p = { name, created: Date.now(), lastPlayed: 0, gamesPlayed: 0, best: { easy: 0, medium: 0, hard: 0 } };
+        p = { name, created: Date.now(), lastPlayed: 0, gamesPlayed: 0, best: { easy: 0, medium: 0, hard: 0 },
+              xp: 0, streak: 0, lastDay: '', missions: 0, maxCombo: 0 };
         if (this.data.legacyBest) {
           p.best.easy = this.data.legacyBest;
           delete this.data.legacyBest;
@@ -732,13 +878,34 @@
       this.save();
       return true;
     },
-    finishGame(name, d, score) {
+    finishGame(name, d, score, extra) {
       const p = this.player(name);
       if (!p) return;
       p.gamesPlayed++;
       p.lastPlayed = Date.now();
+      p.xp += extra.xp;
+      p.missions += extra.missions;
+      p.maxCombo = Math.max(p.maxCombo, extra.maxCombo);
       this.updateBest(name, d, score);
       this.save();
+    },
+    /* Серия дней. Отмечает сегодняшний день: играл вчера — серия растёт,
+       пропустил день — начинается заново с единицы. */
+    touchStreak(name) {
+      const p = this.player(name);
+      if (!p) return 0;
+      const today = dayKey();
+      if (p.lastDay !== today) {
+        p.streak = p.lastDay === dayKey(-1) ? p.streak + 1 : 1;
+        p.lastDay = today;
+        this.save();
+      }
+      return p.streak;
+    },
+    // Текущая серия: считается, если последний день игры — сегодня или вчера
+    streak(name) {
+      const p = this.player(name);
+      return p && (p.lastDay === dayKey() || p.lastDay === dayKey(-1)) ? p.streak : 0;
     },
     // Рейтинг игроков этого устройства
     leaderboard(d, limit = 10) {
@@ -837,6 +1004,8 @@
             settings,
             difficulty: DB.data.difficulty,
             gamesPlayed: p.gamesPlayed,
+            xp: p.xp,
+            streak: p.streak,
             best: p.best,
           }),
         });
@@ -980,8 +1149,8 @@
       this.noise({ dur: 0.06, vol: 0.08, freq: 2500, type: 'highpass' });
     },
     // Чем выше уровень — тем выше и «богаче» звук
-    merge(level) {
-      const base = 300 * Math.pow(1.11, level);
+    merge(level, combo = 1) {
+      const base = 300 * Math.pow(1.11, level) * Math.pow(1.06, Math.min(combo - 1, 8));
       this.tone({ freq: base, to: base * 2, dur: 0.1, vol: 0.32 });
       this.tone({ freq: base * 1.5, dur: 0.22, type: 'triangle', vol: 0.22, delay: 0.06 });
       this.tone({ freq: base * 2, dur: 0.3, vol: 0.12, delay: 0.11 });
@@ -1677,17 +1846,71 @@
     let s = spriteCache.get(lv);
     if (!s) {
       const r = FRUITS[lv].r;
-      const size = Math.ceil(r * 3.2 * pr);
+      // Границы спрайта — вплотную к фрукту: запас сверху только под листики и хохолок.
+      // Чем меньше прозрачных полей, тем дешевле копирование.
+      const top = FRUITS[lv].type === 'pineapple' ? 1.62 : 1.32;
+      const x = -1.14 * r, y = -top * r, w = 2.28 * r, h = (top + 1.12) * r;
       const c = document.createElement('canvas');
-      c.width = c.height = size;
+      c.width = Math.ceil(w * pr);
+      c.height = Math.ceil(h * pr);
       const g = c.getContext('2d');
-      g.translate(size / 2, size / 2);
       g.scale(pr, pr);
+      g.translate(-x, -y);
       drawFruit(g, lv, r, false);
-      s = { canvas: c, size: size / pr };
+      s = { canvas: c, x, y, w: c.width / pr, h: c.height / pr };
       spriteCache.set(lv, s);
     }
     return s;
+  }
+
+  /* Рожицы тоже кэшируются: для каждого фрукта — по картинке на выражение
+     и фазу моргания. В кадре остаётся только скопировать готовую картинку,
+     без градиентов и обрезок. */
+  const FACE_EXPR = ['normal', 'happy', 'dizzy', 'worried', 'surprised'];
+  const BLINK_STAGES = [0, 0.6, 1];   // открыты, прикрыты, закрыты
+  const faceCache = new Map();
+  let faceRatio = 0;
+  function getFaceSprite(lv, expr, stage) {
+    const pr = view.dpr * view.scale;
+    if (pr !== faceRatio) { faceCache.clear(); faceRatio = pr; }
+    if (expr === 'happy' || expr === 'dizzy' || expr === 'surprised') stage = 0; // не моргают
+    const key = lv * 100 + FACE_EXPR.indexOf(expr) * 10 + stage;
+    let s = faceCache.get(key);
+    if (!s) {
+      const r = FRUITS[lv].r;
+      // Область лица в долях радиуса: глаза, брови, румянец, рот, капелька пота
+      const x = -0.94 * r, y = -0.58 * r, w = 1.88 * r, h = 1.2 * r;
+      const c = document.createElement('canvas');
+      c.width = Math.ceil(w * pr);
+      c.height = Math.ceil(h * pr);
+      const g = c.getContext('2d');
+      g.scale(pr, pr);
+      g.translate(-x, -y);
+      drawFace(g, FRUITS[lv], r, { expr, blink: BLINK_STAGES[stage], lookY: 0.25 });
+      s = { canvas: c, x, y, w: c.width / pr, h: c.height / pr };
+      faceCache.set(key, s);
+    }
+    return s;
+  }
+
+  /* Прогрев: спрайты создаются заранее и по одному за тик, чтобы первое
+     появление нового фрукта посреди игры не давало рывка. */
+  let prewarmTimer = 0;
+  function prewarmSprites() {
+    clearTimeout(prewarmTimer);
+    const jobs = [];
+    for (let lv = 0; lv < FRUITS.length; lv++) {
+      jobs.push(() => getSprite(lv));
+      jobs.push(() => getFaceSprite(lv, 'normal', 0));
+      jobs.push(() => getFaceSprite(lv, 'happy', 0));
+    }
+    const run = () => {
+      const job = jobs.shift();
+      if (!job) return;
+      job();
+      prewarmTimer = setTimeout(run, 30);
+    };
+    prewarmTimer = setTimeout(run, 200);
   }
 
   /* =========================================================
@@ -1711,16 +1934,44 @@
     playersBlock: $('#playersBlock'), playerChips: $('#playerChips'),
     boardTabs: $('#boardTabs'), boardList: $('#boardList'), boardSrc: $('#boardSrc'),
     finalScore: $('#finalScore'), finalBest: $('#finalBest'), newRecord: $('#newRecord'),
-    finalInfo: $('#finalInfo'), finalRank: $('#finalRank'),
+    finalInfo: $('#finalInfo'), finalRank: $('#finalRank'), finalHint: $('#finalHint'),
+    finalXp: $('#finalXp'), finalXpBar: $('#finalXpBar'),
+    mission: $('#mission'), missionText: $('#missionText'), missionCount: $('#missionCount'),
+    plLevel: $('#plLevel'), plRank: $('#plRank'), plXp: $('#plXp'), plStreak: $('#plStreak'), plStreakDays: $('#plStreakDays'),
   };
   const overlays = [ui.menu, ui.gameover, ui.nameScreen, ui.board, ui.settings];
   // Параметры отображения: масштаб мира и смещение внутри канваса (в CSS-пикселях)
   const view = { dpr: 1, cw: 0, ch: 0, scale: 1, ox: 0, oy: 0 };
+  let uiOpen = false;       // открыто ли окно (меню, настройки, итоги)
+  let renderDirty = true;   // нужно ли перерисовать кадр, пока игра стоит под окном
+
+  /* Автоподстройка качества. Если устройство не успевает рисовать кадр,
+     игра ступенями снижает разрешение канваса и число частиц. Обратно
+     качество не поднимается, чтобы картинка не «прыгала». */
+  const Quality = {
+    level: 0,
+    scales: [1, 0.8, 0.64],     // множитель разрешения
+    fx: [1, 0.7, 0.45],         // множитель числа частиц
+    sum: 0, n: 0,
+    get scale() { return this.scales[this.level]; },
+    get fxScale() { return this.fx[this.level]; },
+    // work — сколько миллисекунд ушло на физику и отрисовку кадра
+    sample(work) {
+      this.sum += work;
+      if (++this.n < 90) return;
+      const avg = this.sum / this.n;
+      this.sum = this.n = 0;
+      if (avg > 11 && this.level < this.scales.length - 1) {
+        this.level++;
+        resize();
+      }
+    },
+  };
 
   /* =========================================================
      ФИЗИКА
      ========================================================= */
-  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
+  const engine = Engine.create({ positionIterations: 8, velocityIterations: 6 });
   engine.gravity.y = 1.1;
 
   /* Стенки стакана под текущую сложность. Боковые продлены высоко вверх —
@@ -1742,8 +1993,13 @@
     Composite.add(engine.world, walls);
   }
 
-  function getFruits() {
-    return Composite.allBodies(engine.world).filter((b) => b.label === 'fruit');
+  /* Все фрукты в стакане. Список ведётся вручную — не нужно каждый кадр
+     перебирать и фильтровать все тела физического мира. */
+  const fruits = [];
+  function removeFruit(b) {
+    Composite.remove(engine.world, b);
+    const i = fruits.indexOf(b);
+    if (i >= 0) fruits.splice(i, 1);
   }
 
   function createFruit(level, x, y, pop = false) {
@@ -1771,6 +2027,7 @@
       idleAt: state.time + rand(5000, 12000),
     };
     Composite.add(engine.world, b);
+    fruits.push(b);
     return b;
   }
 
@@ -1815,7 +2072,8 @@
       const y = (a.position.y + b.position.y) / 2;
       const vx = (a.velocity.x + b.velocity.x) / 2;
       const vy = (a.velocity.y + b.velocity.y) / 2;
-      Composite.remove(engine.world, [a, b]);
+      removeFruit(a);
+      removeFruit(b);
 
       if (lv === LAST_LEVEL) {
         // Два арбуза — исчезают с большим бонусом
@@ -1827,6 +2085,7 @@
         addScore(bonus, x, y, 'АРБУЗ! +' + bonus);
         state.shakes++; state.bombs++;
         fx.popup(WORLD_W / 2, GLASS.top + 60, '+1 бустер', '#4cc36b', 22);
+        Missions.onMerge(-1, bumpCombo());
         Sound.watermelon();
         vibrate([60, 40, 120]);
         updateBoosters();
@@ -1843,10 +2102,14 @@
       fx.flash(nx, ny, r, FRUITS[nl].c1);
       fx.burst(nx, ny, nl, 14 + nl * 3, 1.4 + nl * 0.15);
       if (nl >= 7) fx.cameraShake(4 + nl, 250);
-      addScore(Math.round(MERGE_POINTS[nl] * diff().multiplier), nx, ny - r);
-      Sound.merge(nl);
+      const combo = bumpCombo();
+      addScore(Math.round(MERGE_POINTS[nl] * diff().multiplier * comboMultiplier(combo)), nx, ny - r);
+      if (combo >= 2) fx.popup(nx, ny - r - 28, 'КОМБО ×' + combo, '#ffb020', 15 + Math.min(13, combo * 2));
+      Sound.merge(nl, combo);
       vibrate(18 + nl * 6);
       if (nl > state.maxLevel) { state.maxLevel = nl; updateEvolution(); }
+      if (nl > state.topLevel) { state.topLevel = nl; setTheme(nl); }
+      Missions.onMerge(nl, combo);
     }
   }
 
@@ -1874,13 +2137,147 @@
     bombMode: false,
     maxLevel: 4,
     nextBonus: 0,
+    topLevel: 4,           // самый крупный фрукт партии — задаёт цвет фона
+    combo: 0, comboUntil: 0, maxCombo: 0,
+    nearBest: false, beatBest: false,
   };
 
-  // Первые броски — маленькие фрукты, затем случайно до maxSpawn
+  /* Выбор следующего фрукта. Первые два — всегда мелкие. Дальше обычно случайный,
+     но чем выше гора фруктов, тем чаще выпадает фрукт, для которого наверху
+     уже лежит пара. В трудный момент у игрока появляется шанс спастись —
+     партия длится дольше, а развязка получается напряжённее. */
   function randomLevel() {
     state.dropsMade++;
-    return state.dropsMade <= 2 ? (Math.random() * 3) | 0 : (Math.random() * (diff().maxSpawn + 1)) | 0;
+    const d = diff();
+    if (state.dropsMade <= 2) return (Math.random() * 3) | 0;
+    // Высота горы: 0 — стакан пуст, 1 — фрукты у самого края
+    let top = GLASS.bottom;
+    for (const b of fruits) {
+      if (state.time - b.born < SPAWN_GRACE) continue; // ещё летит
+      const y = b.position.y - FRUITS[b.level].r;
+      if (y < top) top = y;
+    }
+    const fill = (GLASS.bottom - top) / (GLASS.bottom - GLASS.top);
+    const chance = clamp((fill - 0.5) / 0.4, 0, 1) * d.help;
+    if (Math.random() < chance) {
+      // Кандидаты — мелкие фрукты из верхней части горы: до них можно дотянуться
+      const limit = top + (GLASS.bottom - top) * 0.45;
+      const pool = fruits.filter((b) => b.level <= d.maxSpawn && b.position.y < limit);
+      if (pool.length) return pick(pool).level;
+    }
+    return (Math.random() * (d.maxSpawn + 1)) | 0;
   }
+
+  /* Комбо: слияния подряд с паузой не больше COMBO_WINDOW складываются в цепочку.
+     Каждый шаг цепочки добавляет 25% к очкам (до ×2,5). */
+  const COMBO_WINDOW = 1600;
+  function bumpCombo() {
+    state.combo = state.time < state.comboUntil ? state.combo + 1 : 1;
+    state.comboUntil = state.time + COMBO_WINDOW;
+    if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+    return state.combo;
+  }
+  const comboMultiplier = (combo) => 1 + Math.min(combo - 1, 6) * 0.25;
+
+  // Фон страницы подстраивается под самый крупный фрукт партии
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  function setTheme(level) {
+    const color = FRUITS[level].bg;
+    document.documentElement.style.setProperty('--bg', color);
+    if (themeMeta) themeMeta.setAttribute('content', color);
+  }
+
+  /* Задания. Во время партии всегда есть одна цель. Генератор по кругу выдаёт
+     четыре типа заданий и с каждым кругом поднимает планку; тем, у кого рекорд
+     уже высокий, первые простые круги пропускаются. Награда — бустер и опыт. */
+  const MISSION_XP = 25;
+  const Missions = {
+    index: 0, done: 0, skill: 0, cur: null, nextAt: 0,
+
+    start() {
+      this.index = 0;
+      this.done = 0;
+      this.skill = Math.min(2, Math.floor(state.startBest / (3000 * diff().multiplier)));
+      this.next();
+    },
+    next() {
+      const n = this.index++;
+      const tier = Math.floor(n / 4) + this.skill;
+      const d = diff();
+      let m;
+      switch (n % 4) {
+        case 0: {
+          const level = Math.min(LAST_LEVEL, d.maxSpawn + 1 + tier);
+          const goal = tier === 0 ? 2 : 1;
+          m = { kind: 'make', level, goal, text: `Собери: ${FRUITS[level].name.toLowerCase()}` + (goal > 1 ? ` ×${goal}` : '') };
+          break;
+        }
+        case 1: {
+          const goal = 10 + tier * 5;
+          m = { kind: 'merges', goal, text: `Сделай ${goal} слияний` };
+          break;
+        }
+        case 2: {
+          const goal = Math.min(6, 3 + tier);
+          m = { kind: 'combo', goal, text: `Комбо ×${goal}` };
+          break;
+        }
+        default: {
+          const goal = Math.round((400 + 300 * tier) * d.multiplier);
+          m = { kind: 'score', goal, text: `Набери ещё ${goal} очков` };
+        }
+      }
+      m.progress = 0;
+      m.complete = false;
+      m.reward = n % 2 ? 'bombs' : 'shakes';
+      this.cur = m;
+      this.nextAt = 0;
+      this.render();
+    },
+    // level — уровень получившегося фрукта (−1 для слияния двух арбузов)
+    onMerge(level, combo) {
+      const m = this.cur;
+      if (!m || m.complete) return;
+      if (m.kind === 'make' && level === m.level) m.progress++;
+      else if (m.kind === 'merges') m.progress++;
+      else if (m.kind === 'combo') m.progress = Math.max(m.progress, combo);
+      else return;
+      this.check();
+    },
+    onScore(points) {
+      const m = this.cur;
+      if (!m || m.complete || m.kind !== 'score') return;
+      m.progress += points;
+      this.check();
+    },
+    check() {
+      const m = this.cur;
+      if (m.progress >= m.goal) {
+        m.progress = m.goal;
+        m.complete = true;
+        this.done++;
+        state[m.reward]++;
+        fx.popup(WORLD_W / 2, GLASS.top + 90,
+          'Задание выполнено: +1 ' + (m.reward === 'bombs' ? 'бомба' : 'встряска'), '#4cc36b', 19);
+        Sound.bonus();
+        updateBoosters();
+        this.nextAt = state.time + 1500; // следующее задание — через полторы секунды
+      }
+      this.render();
+    },
+    tick() {
+      if (this.nextAt && state.time >= this.nextAt) this.next();
+    },
+    render() {
+      const m = this.cur;
+      ui.mission.classList.toggle('hidden', !m);
+      if (!m) return;
+      ui.missionText.textContent = m.complete ? 'Выполнено!' : m.text;
+      ui.missionCount.textContent = `${Math.min(m.progress, m.goal)}/${m.goal}`;
+      ui.mission.style.setProperty('--p', (m.progress / m.goal) * 100 + '%');
+      ui.mission.classList.toggle('done', m.complete);
+    },
+  };
 
   function clampAim(x, lv) {
     const r = FRUITS[lv].r;
@@ -1920,18 +2317,37 @@
       Sound.bonus();
       updateBoosters();
     }
+    // Погоня за рекордом: подсказываем, когда он близко, и празднуем, когда побит
+    if (state.startBest > 0) {
+      if (!state.nearBest && state.score >= state.startBest * 0.8 && state.score <= state.startBest) {
+        state.nearBest = true;
+        fx.popup(WORLD_W / 2, GLASS.top - 44, 'Рекорд уже близко!', '#ff7a59', 20);
+      }
+      if (!state.beatBest && state.score > state.startBest) {
+        state.beatBest = true;
+        fx.popup(WORLD_W / 2, GLASS.top - 44, 'Новый рекорд!', '#ffb020', 26);
+        Sound.bonus();
+      }
+    }
+    Missions.onScore(pts);
     updateScore(true);
   }
 
   // Очищает стакан и перестраивает его под сложность state.difficulty
   function clearField() {
     Composite.clear(engine.world, true);
+    fruits.length = 0;
     mergeQueue.length = 0;
+    renderDirty = true;
     fx.clear();
     buildGlass();
     state.current = null;
     state.dangerTime = 0;
     state.maxLevel = diff().maxSpawn;
+    state.topLevel = 4;
+    setTheme(4);
+    Missions.cur = null;
+    Missions.render();
   }
 
   function resetGame() {
@@ -1942,6 +2358,7 @@
       dropTimer: 0, shakeTime: 0, safeTime: 0,
       shakes: d.boosters, bombs: d.boosters, bombMode: false,
       nextBonus: d.boosterEvery, aiming: false,
+      combo: 0, comboUntil: 0, maxCombo: 0, nearBest: false, beatBest: false,
       best: state.startBest,
     });
     state.next = randomLevel();
@@ -1958,9 +2375,19 @@
     state.aiming = false;
     Sound.gameOver();
     vibrate([100, 60, 200]);
-    DB.finishGame(state.player, state.difficulty, state.score);
+    // Опыт: за очки и за выполненные задания
+    const xpGain = Math.round(state.score / 10) + Missions.done * MISSION_XP;
+    const before = levelInfo(DB.player(state.player).xp);
+    DB.finishGame(state.player, state.difficulty, state.score,
+      { xp: xpGain, missions: Missions.done, maxCombo: state.maxCombo });
+    const after = levelInfo(DB.player(state.player).xp);
     Api.track();
     const isRecord = state.score > 0 && state.score > state.startBest;
+    ui.finalXp.textContent = (after.level > before.level ? `Новый уровень ${after.level} — ${after.rank}!` : `Уровень ${after.level}`)
+      + ` · +${xpGain} XP · до следующего ${after.toNext}`;
+    ui.finalXpBar.style.width = after.progress * 100 + '%';
+    // Сколько не хватило до рекорда — чтобы захотелось попробовать ещё раз
+    ui.finalHint.textContent = !isRecord && state.best > state.score ? `До рекорда не хватило ${state.best - state.score}` : '';
     ui.finalInfo.textContent = `${state.player} · ${diff().name}`;
     ui.finalScore.textContent = state.score;
     ui.finalBest.textContent = 'Рекорд: ' + state.best;
@@ -1987,7 +2414,7 @@
     state.shakeKick = 0;
     state.safeTime = 1800; // во время встряски Game Over не засчитывается
     // Подбрасываем все фрукты вверх
-    for (const b of getFruits()) {
+    for (const b of fruits) {
       Body.setVelocity(b, { x: b.velocity.x + rand(-2.5, 2.5), y: -rand(5, 10) * (1.2 - b.level * 0.04) });
       Body.setAngularVelocity(b, rand(-0.15, 0.15));
     }
@@ -2007,16 +2434,16 @@
   // Тап по фрукту в режиме бомбы
   function tryBomb(p) {
     let target = null, bestD = Infinity;
-    for (const b of getFruits()) {
+    for (const b of fruits) {
       const d = Math.hypot(b.position.x - p.x, b.position.y - p.y) - FRUITS[b.level].r;
       if (d < 14 && d < bestD) { bestD = d; target = b; }
     }
     if (!target) return;
     const { x, y } = target.position;
     const lv = target.level;
-    Composite.remove(engine.world, target);
+    removeFruit(target);
     // Взрывная волна слегка расталкивает соседей
-    for (const b of getFruits()) {
+    for (const b of fruits) {
       const dx = b.position.x - x, dy = b.position.y - y;
       const dist = Math.hypot(dx, dy) || 1;
       if (dist < 160) {
@@ -2047,6 +2474,8 @@
 
     burst(x, y, lv, count, power) {
       const f = FRUITS[lv];
+      // Меньше частиц на слабых устройствах и общий потолок
+      count = Math.min(Math.ceil(count * Quality.fxScale), 200 - this.particles.length);
       for (let i = 0; i < count; i++) {
         const a = Math.random() * PI2;
         const sp = rand(60, 160) * power;
@@ -2075,20 +2504,26 @@
     popup(x, y, text, color, size) { this.popups.push({ x, y, text, color, size, t: 0, dur: 1.1 }); },
     cameraShake(mag, ms) { this.cam = { mag, time: ms, dur: ms }; },
 
+    // Отжившие элементы убираются на месте, без создания новых массивов (меньше работы сборщику мусора)
     update(dt) {
+      let n = 0;
       for (const p of this.particles) {
         p.life += dt;
+        if (p.life >= p.max) continue;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         if (p.smoke) { p.vx *= 0.96; p.size *= 1.01; }
         else { p.vy += 420 * dt; p.vx *= 0.99; }
         p.rot += dt * 4;
+        this.particles[n++] = p;
       }
-      this.particles = this.particles.filter((p) => p.life < p.max);
-      for (const f of this.flashes) f.t += dt;
-      this.flashes = this.flashes.filter((f) => f.t < f.dur);
-      for (const p of this.popups) { p.t += dt; p.y -= 38 * dt; }
-      this.popups = this.popups.filter((p) => p.t < p.dur);
+      this.particles.length = n;
+      n = 0;
+      for (const f of this.flashes) { f.t += dt; if (f.t < f.dur) this.flashes[n++] = f; }
+      this.flashes.length = n;
+      n = 0;
+      for (const p of this.popups) { p.t += dt; p.y -= 38 * dt; if (p.t < p.dur) this.popups[n++] = p; }
+      this.popups.length = n;
       if (this.cam.time > 0) this.cam.time -= dt * 1000;
     },
 
@@ -2172,7 +2607,7 @@
       if (state.shakeKick <= 0) {
         state.shakeKick = 150;
         const dir = Math.random() < 0.5 ? -1 : 1;
-        for (const b of getFruits()) {
+        for (const b of fruits) {
           Body.setVelocity(b, { x: b.velocity.x + dir * rand(3, 6), y: b.velocity.y - rand(0, 2.5) });
         }
       }
@@ -2181,8 +2616,8 @@
 
     Engine.update(engine, ms);
     processMerges();
+    Missions.tick();
 
-    const fruits = getFruits();
     for (const b of fruits) if (b.pop < 1) b.pop = Math.min(1, b.pop + ms / 260);
 
     // Таймер появления следующего фрукта
@@ -2209,21 +2644,31 @@
   let lastMuffled = null;
   let acc = 0;
   function frame(now) {
-    const dt = Math.min(now - lastFrame, 100);
+    requestAnimationFrame(frame);
+    const elapsed = now - lastFrame;
+    // На экранах 120 Гц рисуем через кадр: 60 кадров глазу хватает, а процессор и батарея отдыхают
+    if (elapsed < 10) return;
     lastFrame = now;
+    const dt = Math.min(elapsed, 100);
+    const t0 = performance.now();
     if (state.mode === 'playing') {
       acc += dt;
       let n = 0;
       // Проверяем режим на каждом шаге: партия может закончиться посреди кадра
-      while (acc >= STEP && n < 5 && state.mode === 'playing') { step(STEP); acc -= STEP; n++; }
-      if (n === 5) acc = 0;
+      while (acc >= STEP && n < 3 && state.mode === 'playing') { step(STEP); acc -= STEP; n++; }
+      if (n === 3) acc = 0;
     }
     if (state.mode !== 'paused' && state.mode !== 'menu') fx.update(dt / 1000);
     // Во время игры музыка звучит чисто, в меню и на паузе — приглушённо
     const muffled = state.mode !== 'playing';
     if (muffled !== lastMuffled) { lastMuffled = muffled; Sound.muffle(muffled); }
-    render(now);
-    requestAnimationFrame(frame);
+    // Под открытым окном картинка не меняется — перерисовывать её (и размытие поверх) незачем
+    const frozen = uiOpen && state.mode !== 'playing';
+    if (!frozen || renderDirty) {
+      render(now);
+      renderDirty = false;
+    }
+    if (state.mode === 'playing') Quality.sample(performance.now() - t0);
   }
 
   /* =========================================================
@@ -2285,7 +2730,7 @@
   }
 
   // Передняя часть стакана (рисуется ПОСЛЕ фруктов): грани, блики, ободок
-  function drawGlassFront(c, now) {
+  function drawGlassFront(c) {
     const { left: L, right: R, top: T, bottom: B, wall: w, base } = GLASS;
     const cx = (L + R) / 2;
     const ow = R - L + w * 2;
@@ -2348,8 +2793,38 @@
     c.fillStyle = '#ffffff';
     roundRect(c, L - w - 1, T - 4, w + 2, 8, 4); c.fill();
     roundRect(c, R - 1, T - 4, w + 2, 8, 4); c.fill();
+  }
 
-    // Красная линия опасности
+  /* Стакан рисуется один раз в два offscreen-слоя (задний и передний) и потом
+     просто копируется: градиенты, обрезки и контуры не пересчитываются каждый кадр.
+     Слои пересоздаются только при смене масштаба или ширины стакана. */
+  const glassLayers = { key: '', back: null, front: null, y: 0, w: 0, h: 0 };
+  function getGlassLayers() {
+    const pr = view.dpr * view.scale;
+    const key = pr + '|' + GLASS.left;
+    if (glassLayers.key !== key) {
+      const y = GLASS.top - 24;
+      const h = GLASS.bottom + GLASS.base + 30 - y;
+      const make = (draw) => {
+        const cv = document.createElement('canvas');
+        cv.width = Math.ceil(WORLD_W * pr);
+        cv.height = Math.ceil(h * pr);
+        const g = cv.getContext('2d');
+        g.scale(pr, pr);
+        g.translate(0, -y);
+        draw(g);
+        return cv;
+      };
+      const back = make(drawGlassBack), front = make(drawGlassFront);
+      Object.assign(glassLayers, { key, y, back, front, w: back.width / pr, h: back.height / pr });
+    }
+    return glassLayers;
+  }
+
+  // Красная линия опасности и шкала оставшегося времени
+  function drawDanger(c, now) {
+    const { left: L, right: R, top: T, wall: w } = GLASS;
+    const cx = (L + R) / 2;
     if (state.dangerTime > 0 && state.mode !== 'menu') {
       const k = Math.min(1, state.dangerTime / diff().dangerLimit);
       const blink = 0.5 + 0.5 * Math.sin(now / (90 - k * 50));
@@ -2398,14 +2873,16 @@
 
   /* Фрукт с живой рожицей. sx/sy — сплющивание вдоль осей экрана
      (применяется до поворота, поэтому фрукт «пружинит» по вертикали). */
-  function drawLiveFruit(c, lv, x, y, angle, scale, sx, sy, face) {
+  function drawLiveFruit(c, lv, x, y, angle, scale, sx, sy, faceSprite, faceOpts) {
     const s = getSprite(lv);
     c.save();
     c.translate(x, y);
     c.scale(scale * sx, scale * sy);
     if (angle) c.rotate(angle);
-    c.drawImage(s.canvas, -s.size / 2, -s.size / 2, s.size, s.size);
-    drawFace(c, FRUITS[lv], FRUITS[lv].r, face);
+    c.drawImage(s.canvas, s.x, s.y, s.w, s.h);
+    // В стакане рожица берётся из кэша; у висящего фрукта рисуется вживую (он следит глазами)
+    if (faceSprite) c.drawImage(faceSprite.canvas, faceSprite.x, faceSprite.y, faceSprite.w, faceSprite.h);
+    else drawFace(c, FRUITS[lv], FRUITS[lv].r, faceOpts);
     c.restore();
   }
 
@@ -2419,7 +2896,7 @@
     return t < 1 ? Math.sin(t * Math.PI) : 0;
   }
 
-  // Выражение лица фрукта в стакане
+  // Рожица фрукта в стакане: выражение по ситуации + фаза моргания
   function fruitFace(b, now) {
     const a = b.anim, t = state.time;
     let expr = 'normal';
@@ -2434,7 +2911,8 @@
       a.happyUntil = t + 1200;
       a.idleAt = t + rand(6000, 14000);
     }
-    return { expr, blink: blinkOf(a, now), lookY: 0.25 };
+    const blink = blinkOf(a, now);
+    return getFaceSprite(b.level, expr, blink > 0.75 ? 2 : blink > 0.3 ? 1 : 0);
   }
 
   function render(now) {
@@ -2458,8 +2936,8 @@
       ctx.translate(-WORLD_W / 2, -GLASS.bottom);
     }
 
-    const fruits = getFruits();
-    drawGlassBack(ctx);
+    const layers = getGlassLayers();
+    ctx.drawImage(layers.back, 0, layers.y, layers.w, layers.h);
 
     // Направляющая и висящий фрукт
     const cur = state.current;
@@ -2473,10 +2951,10 @@
       const s = b.pop < 1 ? 0.5 + 0.5 * easeOutBack(b.pop) : 1;
       // Затухающие колебания после удара + лёгкое «дыхание»
       const age = (state.time - a.squashAt) / 1000;
-      const q = a.squash * Math.exp(-age * 7) * Math.cos(age * 28);
+      const q = age < 0.8 ? a.squash * Math.exp(-age * 7) * Math.cos(age * 28) : 0;
       const breath = Math.sin(now / 450 + a.phase) * 0.018;
       drawLiveFruit(ctx, b.level, b.position.x, b.position.y, b.angle, s,
-        1 + q * 0.16 - breath, 1 - q * 0.16 + breath, fruitFace(b, now));
+        1 + q * 0.16 - breath, 1 - q * 0.16 + breath, fruitFace(b, now), null);
     }
 
     // Режим бомбы: пульсирующие прицелы на фруктах
@@ -2493,7 +2971,8 @@
       ctx.setLineDash([]);
     }
 
-    drawGlassFront(ctx, now);
+    ctx.drawImage(layers.front, 0, layers.y, layers.w, layers.h);
+    drawDanger(ctx, now);
 
     if (showDropper) {
       // Висящий фрукт покачивается, моргает и косится в сторону движения
@@ -2504,7 +2983,7 @@
       const stretch = Math.sin(now / 300) * 0.025;
       ctx.globalAlpha = state.bombMode ? 0.35 : 1;
       drawLiveFruit(ctx, cur.level, aimX, DROP_Y + bob, Math.sin(now / 500) * 0.06,
-        0.4 + 0.6 * easeOutBack(cur.appear), 1 - stretch, 1 + stretch,
+        0.4 + 0.6 * easeOutBack(cur.appear), 1 - stretch, 1 + stretch, null,
         { expr: state.bombMode ? 'worried' : 'normal', blink: blinkOf(da, now), lookX: da.look, lookY: 0.7 });
       ctx.globalAlpha = 1;
     }
@@ -2528,7 +3007,7 @@
       ctx.font = '700 19px Fredoka, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const text = '💣 Коснись фрукта, чтобы взорвать';
+      const text = 'Коснись фрукта, чтобы взорвать';
       const w = Math.min(ctx.measureText(text).width + 32, WORLD_W - 16);
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       roundRect(ctx, WORLD_W / 2 - w / 2, 34, w, 38, 19);
@@ -2577,7 +3056,7 @@
       c.save();
       c.translate(it.x, it.y);
       if (it.rot) c.rotate(it.rot);
-      drawFruit(c, it.lv, it.r);
+      drawFruit(c, it.lv, it.r, it.face); // face: false — фрукт без рожицы
       c.restore();
     }
   }
@@ -2605,7 +3084,8 @@
     [...ui.evo.children].forEach((item, lv) => {
       paintFruitCanvas(item.firstChild, (w) => {
         const r = (w / 2) * (0.42 + 0.3 * (lv / LAST_LEVEL));
-        return [{ lv, x: w / 2, y: w / 2 + r * 0.18, r }];
+        // В полосе эволюции фрукты без рожиц — просто картинки
+        return [{ lv, x: w / 2, y: w / 2 + r * 0.18, r, face: false }];
       });
     });
     updateEvolution();
@@ -2645,12 +3125,15 @@
 
   function showOverlay(el) {
     el.classList.add('show');
+    uiOpen = true;
+    renderDirty = true;
     Sound.swoosh();
     if (el === ui.menu) drawHeroes();
     if (el === ui.gameover) drawOverHero();
   }
   function hideOverlays() {
     overlays.forEach((el) => el.classList.remove('show'));
+    uiOpen = false;
   }
 
   // Ставит игру на паузу, если она идёт
@@ -2679,6 +3162,14 @@
     ui.diffPicker.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b.dataset.diff === sel));
     ui.diffDesc.textContent = DIFFICULTIES[sel].desc;
     ui.menuBest.textContent = DB.best(state.player, sel);
+    const pl = DB.player(state.player);
+    const info = levelInfo(pl ? pl.xp : 0);
+    ui.plLevel.textContent = info.level;
+    ui.plRank.textContent = info.rank;
+    ui.plXp.style.width = info.progress * 100 + '%';
+    const streak = DB.streak(state.player);
+    ui.plStreak.classList.toggle('hidden', streak < 2);
+    ui.plStreakDays.textContent = `${streak} ${plural(streak, 'день', 'дня', 'дней')}`;
     if (state.mode !== 'paused') {
       state.best = DB.best(state.player, sel);
       updateScore(false);
@@ -2706,7 +3197,7 @@
     ui.volSfx.value = Math.round(settings.sfx * 100);
     ui.optVibration.checked = settings.vibration;
     ui.btnFullscreen.classList.toggle('hidden', !Fullscreen.supported);
-    ui.btnFullscreen.textContent = Fullscreen.active() ? '⛶ Выйти из полноэкранного режима' : '⛶ На весь экран';
+    $('#fsLabel').textContent = Fullscreen.active() ? 'Оконный режим' : 'На весь экран';
     ui.iosTip2.classList.toggle('hidden', !(IS_IOS && !DB.data.device.standalone));
     updateSliderLabels();
     showOverlay(ui.settings);
@@ -2727,7 +3218,17 @@
   function startNewGame() {
     state.difficulty = DB.data.difficulty;
     state.startBest = DB.best(state.player, state.difficulty);
+    const streak = DB.touchStreak(state.player);
     resetGame();
+    Missions.start();
+    // Бонус за серию дней: со 2-го дня +1 бомба, с 5-го ещё и +1 встряска
+    if (streak >= 2) {
+      state.bombs++;
+      if (streak >= 5) state.shakes++;
+      fx.popup(WORLD_W / 2, GLASS.top + 40,
+        `${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд: ` + (streak >= 5 ? '+1 бомба и встряска' : '+1 бомба'), '#ff7a2f', 18);
+      updateBoosters();
+    }
   }
 
   /* --- Выбор имени --- */
@@ -2789,8 +3290,18 @@
     if (remote && Array.isArray(remote.scores) && boardDiff === d) renderBoard(remote.scores, 'Общий рейтинг');
   }
 
+  // Создаёт <svg class="ico"><use href="#i-имя"/></svg>
+  function svgIcon(name, cls = '') {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'ico ' + cls);
+    const use = document.createElementNS(NS, 'use');
+    use.setAttribute('href', '#i-' + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
   function renderBoard(rows, source) {
-    const medals = ['🥇', '🥈', '🥉'];
     const me = (state.player || '').toLowerCase();
     ui.boardList.replaceChildren();
     if (!rows.length) {
@@ -2804,7 +3315,8 @@
       if (String(r.name).toLowerCase() === me) li.className = 'me';
       const pos = document.createElement('span');
       pos.className = 'pos';
-      pos.textContent = medals[i] || i + 1;
+      if (i < 3) pos.appendChild(svgIcon('medal', 'medal m' + (i + 1)));
+      else pos.textContent = i + 1;
       const nm = document.createElement('span');
       nm.className = 'nm';
       nm.textContent = r.name;
@@ -2822,7 +3334,8 @@
      ========================================================= */
   function resize() {
     const rect = stage.getBoundingClientRect();
-    view.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    // Больше 2× глаз в динамике не различает, а пикселей на экранах 3× в 2,25 раза больше
+    view.dpr = Math.min(window.devicePixelRatio || 1, 2) * Quality.scale;
     view.cw = rect.width;
     view.ch = rect.height;
     canvas.width = Math.max(1, Math.round(rect.width * view.dpr));
@@ -2830,6 +3343,8 @@
     view.scale = Math.min(view.cw / WORLD_W, view.ch / WORLD_H);
     view.ox = (view.cw - WORLD_W * view.scale) / 2;
     view.oy = (view.ch - WORLD_H * view.scale) / 2;
+    renderDirty = true;
+    prewarmSprites();
     drawNext();
     drawEvolution();
     if (ui.menu.classList.contains('show')) drawHeroes();
@@ -2991,7 +3506,7 @@
   requestAnimationFrame(frame);
 
   // Хук для отладки из консоли
-  window.FruitMerge = { state, engine, createFruit, FRUITS, GLASS, DB, DIFFICULTIES, Sound, Music, settings };
+  window.FruitMerge = { state, engine, createFruit, fruits, randomLevel, Missions, FRUITS, GLASS, DB, DIFFICULTIES, Sound, Music, settings, Quality, view };
 })();
 </script>
 </body>
