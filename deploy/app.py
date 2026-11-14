@@ -10,6 +10,15 @@ scores.json — общий рейтинг, лучший результат иг�
       "hard":   {}
     }
 
+    Там же раздел "daily" — таблицы испытания дня, отдельная на каждую дату:
+      "daily": {"2026-11-14": {"марсель": {...}}}
+
+games.json — итоги партий для статистики (последние 5000):
+    {"games": [{"date": "...", "deviceId": "...", "name": "Марсель", "difficulty": "easy",
+                "score": 1840, "duration": 312, "drops": 96, "merges": 71, "maxLevel": 8,
+                "maxCombo": 4, "missions": 3, "revived": true}]}
+    Сводку по этим данным печатает deploy/stats.py.
+
 players.json — кто играет, по устройствам:
     {
       "<deviceId>": {
@@ -24,7 +33,10 @@ players.json — кто играет, по устройствам:
 
 API:
     GET  /api/leaderboard?difficulty=easy   -> {"difficulty": "easy", "scores": [{"name", "score"}, ...]}
-    POST /api/scores   {"name", "difficulty", "score"}           -> {"rank", "best", "record"}
+         (для испытания дня: difficulty=daily&day=2026-11-14)
+    POST /api/scores   {"name", "difficulty", "score"[, "day"]}  -> {"rank", "best", "record", "gap"}
+         gap — сколько очков не хватает до следующего места
+    POST /api/games    {итог партии}                             -> {"ok": true}
     POST /api/players  {"name", "device", "settings", ...}       -> {"ok": true}
     GET  /healthz                                                -> ok
 
@@ -38,7 +50,7 @@ import os
 import re
 import tempfile
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -47,6 +59,10 @@ DATA_DIR = Path(os.environ.get("FRUIT_MERGE_DATA", Path(__file__).resolve().pare
 CORS_ORIGINS = [o.strip() for o in os.environ.get("FRUIT_MERGE_CORS", "*").split(",") if o.strip()]
 
 DIFFICULTIES = ("easy", "medium", "hard")
+BOARDS = DIFFICULTIES + ("daily",)   # таблицы рейтинга: три сложности и испытание дня
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DAILY_KEEP_DAYS = 7
+MAX_GAMES = 5000
 NAME_RE = re.compile(r"^[\w .-]{2,16}$")  # \w в Python 3 — буквы любых алфавитов, цифры и _
 DEVICE_ID_RE = re.compile(r"^[\w-]{8,64}$")
 MAX_SCORE = 10_000_000
@@ -98,29 +114,37 @@ class JsonStore:
 
 
 class ScoreDB(JsonStore):
-    """Общий рейтинг: лучший результат каждого игрока на каждой сложности."""
+    """Общий рейтинг: лучший результат каждого игрока в каждой таблице."""
 
-    def _read_tables(self) -> dict:
-        data = self.read()
-        for d in DIFFICULTIES:
-            if not isinstance(data.get(d), dict):
-                data[d] = {}
-        return data
+    def _table(self, data: dict, board: str, day: str) -> dict:
+        """Возвращает (создавая при необходимости) нужную таблицу внутри data."""
+        if board != "daily":
+            if not isinstance(data.get(board), dict):
+                data[board] = {}
+            return data[board]
+        daily = data.setdefault("daily", {})
+        if not isinstance(daily, dict):
+            daily = data["daily"] = {}
+        # Старые дни не храним
+        oldest = (date.today() - timedelta(days=DAILY_KEEP_DAYS)).isoformat()
+        for old in [d for d in daily if d < oldest]:
+            del daily[old]
+        return daily.setdefault(day, {})
 
     @staticmethod
     def _ranked(table: dict) -> list:
         return sorted(table.values(), key=lambda e: (-e["score"], e["date"]))
 
-    def top(self, difficulty: str, limit: int = TOP_LIMIT) -> list:
+    def top(self, board: str, day: str = "", limit: int = TOP_LIMIT) -> list:
         with self.locked():
-            table = self._read_tables()[difficulty]
+            table = self._table(self.read(), board, day)
         return [{"name": e["name"], "score": e["score"]} for e in self._ranked(table)[:limit]]
 
-    def submit(self, name: str, difficulty: str, score: int) -> dict:
+    def submit(self, name: str, board: str, score: int, day: str = "") -> dict:
         key = name.casefold()
         with self.locked():
-            data = self._read_tables()
-            table = data[difficulty]
+            data = self.read()
+            table = self._table(data, board, day)
             entry = table.get(key)
             record = entry is None or score > entry["score"]
             if record:
@@ -128,7 +152,39 @@ class ScoreDB(JsonStore):
                 self.write(data)
             ranked = self._ranked(table)
         rank = next(i for i, e in enumerate(ranked, 1) if e["name"].casefold() == key)
-        return {"rank": rank, "best": table[key]["score"], "record": record}
+        best = table[key]["score"]
+        # Сколько очков не хватает, чтобы обойти игрока на место выше
+        gap = ranked[rank - 2]["score"] - best + 1 if rank > 1 else 0
+        return {"rank": rank, "best": best, "record": record, "gap": gap}
+
+
+class GamesDB(JsonStore):
+    """Журнал партий для статистики: длительность, счёт, чем закончилась."""
+
+    INT_FIELDS = ("score", "duration", "drops", "merges", "maxLevel", "maxCombo", "missions")
+
+    def add(self, payload: dict):
+        name = " ".join(str(payload.get("name", "")).split())
+        device_id = payload.get("deviceId")
+        if not NAME_RE.match(name):
+            return "invalid name"
+        if not isinstance(device_id, str) or not DEVICE_ID_RE.match(device_id):
+            return "invalid deviceId"
+        if payload.get("difficulty") not in BOARDS:
+            return "invalid difficulty"
+        entry = {"date": now_iso(), "deviceId": device_id, "name": name, "difficulty": payload["difficulty"]}
+        for key in self.INT_FIELDS:
+            value = payload.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_SCORE:
+                entry[key] = value
+        entry["revived"] = payload.get("revived") is True
+        with self.locked():
+            data = self.read()
+            games = data.get("games") if isinstance(data.get("games"), list) else []
+            games.append(entry)
+            data["games"] = games[-MAX_GAMES:]
+            self.write(data)
+        return None
 
 
 class PlayersDB(JsonStore):
@@ -167,7 +223,7 @@ class PlayersDB(JsonStore):
     def clean_best(raw) -> dict:
         if not isinstance(raw, dict):
             return {}
-        return {d: raw[d] for d in DIFFICULTIES
+        return {d: raw[d] for d in BOARDS
                 if isinstance(raw.get(d), int) and not isinstance(raw.get(d), bool) and 0 <= raw[d] <= MAX_SCORE}
 
     def upsert(self, payload: dict):
@@ -191,7 +247,7 @@ class PlayersDB(JsonStore):
             settings = self.clean_settings(payload.get("settings"))
             if settings:
                 entry["settings"] = {**entry.get("settings", {}), **settings}
-            if payload.get("difficulty") in DIFFICULTIES:
+            if payload.get("difficulty") in BOARDS:
                 entry["difficulty"] = payload["difficulty"]
             # Счётчики прогресса: число партий, опыт, серия дней
             for key in ("gamesPlayed", "xp", "streak"):
@@ -210,6 +266,7 @@ class PlayersDB(JsonStore):
 
 scores = ScoreDB(DATA_DIR / "scores.json")
 players = PlayersDB(DATA_DIR / "players.json")
+games = GamesDB(DATA_DIR / "games.json")
 
 
 def cors_headers(environ):
@@ -259,20 +316,33 @@ def read_json(environ):
         return None
 
 
+def valid_day(day) -> bool:
+    """Дата испытания: формат ГГГГ-ММ-ДД и не дальше суток от серверной (часовые пояса)."""
+    if not isinstance(day, str) or not DAY_RE.match(day):
+        return False
+    try:
+        return abs((date.fromisoformat(day) - datetime.now(timezone.utc).date()).days) <= 1
+    except ValueError:
+        return False
+
+
 def validate_score(payload):
-    """Возвращает (name, difficulty, score) или строку с ошибкой."""
+    """Возвращает (name, board, score, day) или строку с ошибкой."""
     if not isinstance(payload, dict):
         return "invalid JSON body"
     name = " ".join(str(payload.get("name", "")).split())
-    difficulty = payload.get("difficulty")
+    board = payload.get("difficulty")
     score = payload.get("score")
+    day = payload.get("day", "")
     if not NAME_RE.match(name):
         return "invalid name"
-    if difficulty not in DIFFICULTIES:
+    if board not in BOARDS:
         return "invalid difficulty"
+    if board == "daily" and not valid_day(day):
+        return "invalid day"
     if not isinstance(score, int) or isinstance(score, bool) or not 0 < score <= MAX_SCORE:
         return "invalid score"
-    return name, difficulty, score
+    return name, board, score, day if board == "daily" else ""
 
 
 def static_file(path):
@@ -299,17 +369,27 @@ def application(environ, start_response):
 
         if path == "/api/leaderboard" and method == "GET":
             query = parse_qs(environ.get("QUERY_STRING", ""))
-            difficulty = query.get("difficulty", ["easy"])[0]
-            if difficulty not in DIFFICULTIES:
+            board = query.get("difficulty", ["easy"])[0]
+            day = query.get("day", [""])[0]
+            if board not in BOARDS:
                 return respond_json(start_response, "400 Bad Request", {"error": "invalid difficulty"}, environ)
+            if board == "daily" and not valid_day(day):
+                return respond_json(start_response, "400 Bad Request", {"error": "invalid day"}, environ)
             return respond_json(start_response, "200 OK",
-                                {"difficulty": difficulty, "scores": scores.top(difficulty)}, environ)
+                                {"difficulty": board, "scores": scores.top(board, day)}, environ)
 
         if path == "/api/scores" and method == "POST":
             result = validate_score(read_json(environ))
             if isinstance(result, str):
                 return respond_json(start_response, "400 Bad Request", {"error": result}, environ)
             return respond_json(start_response, "200 OK", scores.submit(*result), environ)
+
+        if path == "/api/games" and method == "POST":
+            payload = read_json(environ)
+            error = games.add(payload) if isinstance(payload, dict) else "invalid JSON body"
+            if error:
+                return respond_json(start_response, "400 Bad Request", {"error": error}, environ)
+            return respond_json(start_response, "200 OK", {"ok": True}, environ)
 
         if path == "/api/players" and method == "POST":
             payload = read_json(environ)
