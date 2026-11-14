@@ -1,7 +1,7 @@
 {
-  "name": "Fruit Merge",
-  "short_name": "Fruit Merge",
-  "description": "Бросай фрукты в стакан и собирай арбуз",
+  "name": "Fruit Games",
+  "short_name": "Fruit Games",
+  "description": "Собирай коктейли из фруктов и режь их на лету",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",

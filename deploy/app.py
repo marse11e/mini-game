@@ -59,7 +59,7 @@ DATA_DIR = Path(os.environ.get("FRUIT_MERGE_DATA", Path(__file__).resolve().pare
 CORS_ORIGINS = [o.strip() for o in os.environ.get("FRUIT_MERGE_CORS", "*").split(",") if o.strip()]
 
 DIFFICULTIES = ("easy", "medium", "hard")
-BOARDS = DIFFICULTIES + ("daily",)   # таблицы рейтинга: три сложности и испытание дня
+BOARDS = DIFFICULTIES + ("daily", "slice")   # таблицы рейтинга: три сложности, испытание дня и нарезка
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DAILY_KEEP_DAYS = 7
 MAX_GAMES = 5000
@@ -161,7 +161,7 @@ class ScoreDB(JsonStore):
 class GamesDB(JsonStore):
     """Журнал партий для статистики: длительность, счёт, чем закончилась."""
 
-    INT_FIELDS = ("score", "duration", "drops", "merges", "maxLevel", "maxCombo", "missions")
+    INT_FIELDS = ("score", "duration", "drops", "merges", "maxLevel", "maxCombo", "missions", "cocktails")
 
     def add(self, payload: dict):
         name = " ".join(str(payload.get("name", "")).split())

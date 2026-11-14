@@ -48,7 +48,7 @@ def main() -> None:
     by_diff = defaultdict(list)
     for g in games:
         by_diff[g["difficulty"]].append(g)
-    names = {"easy": "Лёгкий", "medium": "Средний", "hard": "Сложный", "daily": "Испытание дня"}
+    names = {"easy": "Лёгкий", "medium": "Средний", "hard": "Сложный", "daily": "Испытание дня", "slice": "Нарезка"}
     print("\nПо режимам:")
     for diff, rows in by_diff.items():
         scores = [g.get("score", 0) for g in rows]
@@ -56,6 +56,11 @@ def main() -> None:
         revived = sum(1 for g in rows if g.get("revived"))
         print(f"  {names.get(diff, diff)}: партий {len(rows)}, счёт средний {mean(scores):.0f} / лучший {max(scores)}, "
               f"длительность средняя {mean(durations) / 60:.1f} мин, второй шанс использован в {revived / len(rows):.0%}")
+    merge_games = [g for g in games if g["difficulty"] != "slice"]
+    if merge_games:
+        cocktails = Counter(g.get("cocktails", 0) for g in merge_games)
+        print("\nКоктейлей за партию: " + ", ".join(f"{k} — {v}" for k, v in sorted(cocktails.items())))
+    games = merge_games
     reached = Counter(g.get("maxLevel", 0) for g in games)
     fruit = ["черника", "малина", "клубника", "лайм", "персик", "апельсин", "яблоко", "гранат", "кокос", "ананас", "арбуз"]
     print("\nДо какого фрукта доходят:")
